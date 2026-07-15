@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>智慧騎行 追逐模式</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #06060f;
+        font-family: 'Noto Sans TC', 'Microsoft JhengHei', system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      /* 載入遮罩（Pixi 初始化前） */
+      #boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(ellipse at 50% 30%, #12122a 0%, #06060f 70%);
+        color: #f8fafc;
+        z-index: 10;
+        transition: opacity 0.4s ease;
+      }
+      #boot .brand {
+        font-size: 11px;
+        letter-spacing: 0.35em;
+        color: #22d3ee;
+        font-weight: 700;
+        margin-bottom: 12px;
+      }
+      #boot .title {
+        font-size: 28px;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+      #boot .sub {
+        font-size: 14px;
+        color: #fbbf24;
+        letter-spacing: 0.4em;
+        font-weight: 700;
+        margin-bottom: 32px;
+      }
+      #boot .spinner {
+        width: 36px;
+        height: 36px;
+        border: 2px solid rgba(34, 211, 238, 0.2);
+        border-top-color: #22d3ee;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      #boot.hide { opacity: 0; pointer-events: none; }
+    </style>
+  </head>
+  <body>
+    <div id="boot">
+      <div class="brand">SMART CYCLING</div>
+      <div class="title">智慧騎行</div>
+      <div class="sub">追逐模式</div>
+      <div class="spinner"></div>
+    </div>
+    <script type="module" src="./index.ts"></script>
+    <script type="module">
+      // 當 canvas 出現時隱藏 boot
+      const boot = document.getElementById('boot')
+      const obs = new MutationObserver(() => {
+        if (document.querySelector('canvas')) {
+          boot?.classList.add('hide')
+          setTimeout(() => boot?.remove(), 450)
+          obs.disconnect()
+        }
+      })
+      obs.observe(document.body, { childList: true })
+    </script>
+  </body>
+</html>

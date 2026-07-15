@@ -1,0 +1,25 @@
+appId: com.smartcycling.cyclingchasegame
+productName: 智慧騎行追逐模式
+directories:
+  output: release
+
+files:
+  - dist/**
+  - dist-electron/**
+  - assets/**
+
+linux:
+  target:
+    - target: AppImage
+      arch: arm64
+  category: Game
+
+win:
+  target:
+    - target: nsis
+      arch: x64
+  icon: assets/icon.ico
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
