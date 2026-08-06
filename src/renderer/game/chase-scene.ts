@@ -331,11 +331,24 @@ export class ChaseScene extends PIXI.Container {
     if (bg.showForest) this._buildForest(W, H, gY, bg)
     if (bg.showCity) this._buildCity(W, H, gY, bg)
     if (bg.showCemetery) this._buildCemetery(W, H, gY, bg)
+    if (bg.showRuins) this._buildRuins(W, H, gY, bg)
+    if (bg.showFarmland) this._buildFarmland(W, H, gY, bg)
+    if (bg.showMountainWorks) this._buildMountainWorks(W, H, gY, bg)
+    if (bg.showUrbanStreet) this._buildUrbanStreet(W, H, gY, bg)
+    if (bg.showTraditionalAlley) this._buildTraditionalAlley(W, H, gY, bg)
+    if (bg.showHospital) this._buildHospital(W, H, gY, bg)
+    if (bg.showFireScene) this._buildFireScene(W, H, gY, bg)
+    if (bg.showWaterfront) this._buildWaterfront(W, H, gY, bg)
     if (bg.showFog) this._buildFog(W, H, gY)
     if (bg.showFireflies) this._initFireflies(W, gY)
     if (bg.showWillOWisp) this._initWillOWisps(W, gY, bg.skyAccent)
+    if (bg.showUfoLights) this._initUfoLights(W, gY, bg.skyAccent)
+    if (bg.showDust) this._initDust(W, gY)
+    if (bg.showHazardBeacons) this._buildHazardBeacons(W, gY, bg)
     if (bg.showFallingLeaves) this._initLeaves(W, gY)
-    if (bg.showNeon && bg.showCity) this._buildNeonAccents(W, H, gY, bg)
+    if (bg.showNeon && (bg.showCity || bg.showUrbanStreet)) {
+      this._buildNeonAccents(W, H, gY, bg)
+    }
   }
 
   private _buildMoon(W: number, H: number, skyColor: number, accent: number) {
@@ -609,6 +622,378 @@ export class ChaseScene extends PIXI.Container {
         life: 4 + Math.random() * 6,
         maxLife: 6,
         baseAlpha: g.alpha,
+      })
+    }
+  }
+
+  /**
+   * 廢棄鄉下聚落（跳殭屍）：三合院剪影、枯樹、傾斜舊碑、青灰夜色。
+   */
+  private _buildRuins(W: number, H: number, gY: number, bg: ChaseTheme['background']) {
+    const far = new PIXI.Graphics()
+    // 枯樹
+    for (let i = 0; i < 6; i++) {
+      const x = 40 + i * (W / 5.5) + Math.random() * 30
+      const h = 55 + Math.random() * 70
+      far.rect(x - 2, gY - h * 0.5, 4, h * 0.5).fill({ color: bg.farLayer, alpha: 0.95 })
+      far.moveTo(x, gY - h * 0.45).lineTo(x - 22, gY - h * 0.6)
+        .stroke({ color: bg.farLayer, width: 2, alpha: 0.9 })
+      far.moveTo(x, gY - h * 0.5).lineTo(x + 26, gY - h * 0.7)
+        .stroke({ color: bg.farLayer, width: 2, alpha: 0.9 })
+    }
+    this.bgLayer.addChild(far)
+
+    const mid = new PIXI.Graphics()
+    // 三合院簡化剪影：中堂 + 左右廂
+    const baseX = W * 0.12
+    const roofY = gY - 70
+    mid.rect(baseX, roofY + 20, 120, 50).fill({ color: bg.midLayer, alpha: 0.95 })
+    mid.poly([baseX - 8, roofY + 22, baseX + 60, roofY, baseX + 128, roofY + 22])
+      .fill({ color: bg.midLayer, alpha: 0.98 })
+    mid.rect(baseX - 40, roofY + 30, 36, 40).fill({ color: bg.farLayer, alpha: 0.9 })
+    mid.rect(baseX + 124, roofY + 30, 36, 40).fill({ color: bg.farLayer, alpha: 0.9 })
+    // 另一組較遠廢屋
+    const bx2 = W * 0.62
+    mid.rect(bx2, gY - 48, 90, 48).fill({ color: bg.midLayer, alpha: 0.85 })
+    mid.poly([bx2 - 4, gY - 46, bx2 + 45, gY - 68, bx2 + 94, gY - 46])
+      .fill({ color: bg.midLayer, alpha: 0.9 })
+    // 傾斜舊墓碑點綴
+    for (let i = 0; i < 5; i++) {
+      const gx = 80 + i * (W / 5.2)
+      const bh = 22 + Math.random() * 18
+      const tilt = (Math.random() - 0.5) * 12
+      mid.roundRect(gx + tilt * 0.2, gY - bh, 14, bh, 2)
+        .fill({ color: bg.midLayer, alpha: 0.75 })
+    }
+    this.midLayer.addChild(mid)
+  }
+
+  /**
+   * 夜間田野（外星人）：稻田線條、遠處山、麥田圈痕跡、異常綠霧。
+   */
+  private _buildFarmland(W: number, H: number, gY: number, bg: ChaseTheme['background']) {
+    const fields = new PIXI.Graphics()
+    // 稻田橫線層次
+    for (let i = 0; i < 8; i++) {
+      const y = gY - 8 - i * 6
+      const a = 0.12 + i * 0.03
+      fields.rect(0, y, W, 3).fill({ color: bg.midLayer, alpha: a })
+      // 稀疏稻叢剪影
+      for (let x = i * 17; x < W; x += 28 + (i % 3) * 6) {
+        fields.rect(x, y - 4, 2, 5).fill({ color: bg.farLayer, alpha: 0.35 })
+      }
+    }
+    // 麥田圈：兩個橢圓環
+    const cx = W * 0.35
+    const cy = gY - 28
+    for (const [rx, ry, a] of [[90, 18, 0.18], [50, 10, 0.22]] as const) {
+      fields.ellipse(cx, cy, rx, ry).stroke({ color: bg.skyAccent, width: 2, alpha: a })
+    }
+    fields.ellipse(W * 0.72, gY - 22, 40, 9).stroke({ color: bg.skyAccent, width: 1.5, alpha: 0.15 })
+    this.midLayer.addChild(fields)
+  }
+
+  /**
+   * 夜間山路／工地便道（砂石車）：陡坡山體、護欄、遠處工地燈光。
+   */
+  private _buildMountainWorks(W: number, H: number, gY: number, bg: ChaseTheme['background']) {
+    const mtn = new PIXI.Graphics()
+    // 已由 showMountains 可能畫遠山；此處加近側陡坡塊
+    mtn.poly([
+      0, gY,
+      0, gY - 40,
+      W * 0.15, gY - 90,
+      W * 0.28, gY - 50,
+      W * 0.4, gY - 100,
+      W * 0.55, gY - 45,
+      W * 0.7, gY - 80,
+      W * 0.85, gY - 40,
+      W, gY - 70,
+      W, gY,
+    ]).fill({ color: bg.farLayer, alpha: 0.95 })
+    this.bgLayer.addChild(mtn)
+
+    const works = new PIXI.Graphics()
+    // 護欄柱
+    for (let x = 20; x < W; x += 48) {
+      works.rect(x, gY - 18, 3, 16).fill({ color: 0x6a5a40, alpha: 0.7 })
+      works.rect(x, gY - 18, 40, 2).fill({ color: 0x8a7040, alpha: 0.5 })
+    }
+    // 遠處工地燈光塊
+    for (let i = 0; i < 6; i++) {
+      const x = W * 0.55 + i * 50 + Math.random() * 20
+      const y = gY - 55 - Math.random() * 40
+      works.circle(x, y, 2.5).fill({ color: bg.lamp, alpha: 0.55 })
+      for (let r = 10; r > 0; r -= 3) {
+        works.circle(x, y, r).fill({ color: bg.skyAccent, alpha: (10 - r) / 10 * 0.04 })
+      }
+    }
+    this.midLayer.addChild(works)
+  }
+
+  private _buildHazardBeacons(W: number, gY: number, bg: ChaseTheme['background']) {
+    const g = new PIXI.Graphics()
+    for (let x = 60; x < W; x += 140) {
+      // 三角警示錐簡化
+      g.poly([x, gY - 2, x - 8, gY - 18, x + 8, gY - 18])
+        .fill({ color: 0xf97316, alpha: 0.75 })
+      g.rect(x - 2, gY - 22, 4, 4).fill({ color: bg.lamp, alpha: 0.9 })
+      for (let r = 12; r > 0; r -= 3) {
+        g.circle(x, gY - 24, r).fill({ color: bg.lamp, alpha: (12 - r) / 12 * 0.06 })
+      }
+    }
+    this.roadLayer.addChild(g)
+  }
+
+  /**
+   * 夜間市區街道（Foodpanda）：騎樓列、招牌塊、紅綠燈、便利商店暖光、遠樓。
+   */
+  private _buildUrbanStreet(W: number, H: number, gY: number, bg: ChaseTheme['background']) {
+    const far = new PIXI.Graphics()
+    // 遠方高樓剪影
+    let x = 0
+    while (x < W) {
+      const bw = 36 + Math.random() * 50
+      const bh = 50 + Math.random() * 90
+      far.rect(x, gY - bh, bw, bh).fill({ color: bg.farLayer, alpha: 0.9 })
+      x += bw + 6
+    }
+    this.bgLayer.addChild(far)
+
+    const mid = new PIXI.Graphics()
+    // 騎樓／店面列
+    x = -10
+    while (x < W + 40) {
+      const bw = 70 + Math.random() * 40
+      const bh = 55 + Math.random() * 25
+      mid.rect(x, gY - bh, bw, bh).fill({ color: bg.midLayer, alpha: 0.95 })
+      // 騎樓柱
+      mid.rect(x + 6, gY - bh * 0.55, 5, bh * 0.55).fill({ color: bg.farLayer, alpha: 0.8 })
+      mid.rect(x + bw - 12, gY - bh * 0.55, 5, bh * 0.55).fill({ color: bg.farLayer, alpha: 0.8 })
+      // 招牌（粉／橙／黃）
+      const signs = [bg.lamp, bg.skyAccent, 0xfbbf24, 0x22d3ee]
+      const sc = signs[Math.floor(Math.random() * signs.length)]
+      mid.roundRect(x + 10, gY - bh + 8, bw * 0.55, 10, 2).fill({ color: sc, alpha: 0.55 })
+      // 店內暖光窗
+      mid.rect(x + 14, gY - 28, 18, 14).fill({ color: 0xffe08a, alpha: 0.25 + Math.random() * 0.2 })
+      x += bw + 4
+    }
+    // 紅綠燈柱
+    for (const lx of [W * 0.25, W * 0.7]) {
+      mid.rect(lx, gY - 70, 4, 70).fill({ color: 0x555566, alpha: 0.85 })
+      mid.roundRect(lx - 6, gY - 78, 16, 28, 3).fill({ color: 0x2a2a32, alpha: 0.9 })
+      mid.circle(lx + 2, gY - 70, 3).fill({ color: 0x22c55e, alpha: 0.85 })
+      mid.circle(lx + 2, gY - 62, 3).fill({ color: 0xeab308, alpha: 0.4 })
+      mid.circle(lx + 2, gY - 54, 3).fill({ color: 0xef4444, alpha: 0.35 })
+    }
+    // 地面燈光反射帶
+    mid.rect(0, gY - 6, W, 5).fill({ color: bg.skyAccent, alpha: 0.05 })
+    this.midLayer.addChild(mid)
+  }
+
+  /**
+   * 醫院／急診道（救護車）：醫院建築、十字燈箱、冷白與紅光暈、遠方車燈。
+   */
+  private _buildHospital(W: number, H: number, gY: number, bg: ChaseTheme['background']) {
+    const far = new PIXI.Graphics()
+    // 醫院主樓
+    const hx = W * 0.55
+    far.rect(hx, gY - 110, 160, 110).fill({ color: bg.farLayer, alpha: 0.95 })
+    far.rect(hx + 40, gY - 140, 80, 30).fill({ color: bg.midLayer, alpha: 0.9 })
+    // 窗格
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 5; c++) {
+        far.rect(hx + 12 + c * 28, gY - 95 + r * 22, 14, 12)
+          .fill({ color: 0xa8d4ff, alpha: 0.12 + Math.random() * 0.15 })
+      }
+    }
+    // 紅色十字燈箱
+    far.roundRect(hx + 60, gY - 128, 40, 22, 3).fill({ color: 0xffffff, alpha: 0.85 })
+    far.rect(hx + 76, gY - 124, 8, 14).fill({ color: 0xef4444, alpha: 0.95 })
+    far.rect(hx + 70, gY - 120, 20, 6).fill({ color: 0xef4444, alpha: 0.95 })
+    this.bgLayer.addChild(far)
+
+    const mid = new PIXI.Graphics()
+    // 路側標線感
+    mid.rect(0, gY - 4, W, 3).fill({ color: 0xffffff, alpha: 0.12 })
+    // 遠方車燈點
+    for (let i = 0; i < 8; i++) {
+      const x = Math.random() * W
+      mid.circle(x, gY - 8, 2).fill({ color: 0xffe08a, alpha: 0.4 })
+      mid.circle(x + 14, gY - 8, 2).fill({ color: 0xef4444, alpha: 0.35 })
+    }
+    // 紅色緊急光暈
+    for (let r = 80; r > 0; r -= 12) {
+      mid.circle(W * 0.2, gY - 40, r).fill({ color: 0xef4444, alpha: (80 - r) / 80 * 0.03 })
+    }
+    this.midLayer.addChild(mid)
+  }
+
+  /**
+   * 火災現場感（消防車）：建築剪影、橘紅火光、煙霧、警示反射。
+   */
+  private _buildFireScene(W: number, H: number, gY: number, bg: ChaseTheme['background']) {
+    const far = new PIXI.Graphics()
+    let x = 0
+    while (x < W) {
+      const bw = 40 + Math.random() * 55
+      const bh = 45 + Math.random() * 80
+      far.rect(x, gY - bh, bw, bh).fill({ color: bg.farLayer, alpha: 0.92 })
+      x += bw + 5
+    }
+    this.bgLayer.addChild(far)
+
+    const fire = new PIXI.Graphics()
+    // 遠方火光簇
+    for (const cx of [W * 0.3, W * 0.55, W * 0.75]) {
+      for (let i = 0; i < 5; i++) {
+        const px = cx + (Math.random() - 0.5) * 40
+        const py = gY - 30 - Math.random() * 50
+        for (let r = 18; r > 0; r -= 4) {
+          fire.circle(px, py, r).fill({
+            color: r > 10 ? 0xf97316 : 0xfbbf24,
+            alpha: (18 - r) / 18 * 0.12,
+          })
+        }
+      }
+    }
+    // 煙霧橢圓
+    for (let i = 0; i < 6; i++) {
+      fire.ellipse(
+        W * 0.2 + i * 90,
+        gY - 70 - Math.random() * 30,
+        40 + Math.random() * 30,
+        12 + Math.random() * 8,
+      ).fill({ color: 0x6b7280, alpha: 0.08 })
+    }
+    // 地面橘光反射
+    fire.rect(0, gY - 8, W, 6).fill({ color: 0xf97316, alpha: 0.06 })
+    this.midLayer.addChild(fire)
+  }
+
+  /**
+   * 夜間海邊／河岸（比基尼）：海面反光、護欄、遠城燈光、水波光點。
+   */
+  private _buildWaterfront(W: number, H: number, gY: number, bg: ChaseTheme['background']) {
+    const water = new PIXI.Graphics()
+    // 海／河帶（地平線下半偏下）
+    const waterTop = gY - 28
+    water.rect(0, waterTop, W, gY - waterTop).fill({ color: 0x0a1828, alpha: 0.85 })
+    // 反光橫紋
+    for (let i = 0; i < 10; i++) {
+      const y = waterTop + 4 + i * 3
+      water.rect(0, y, W, 1).fill({ color: bg.skyAccent, alpha: 0.04 + (i % 3) * 0.02 })
+    }
+    // 遠城燈光點列
+    for (let i = 0; i < 20; i++) {
+      water.circle(20 + i * (W / 18), waterTop - 8 - Math.random() * 20, 1.2)
+        .fill({ color: 0xffe08a, alpha: 0.35 + Math.random() * 0.3 })
+    }
+    this.bgLayer.addChild(water)
+
+    const rail = new PIXI.Graphics()
+    // 簡易護欄
+    for (let x = 10; x < W; x += 36) {
+      rail.rect(x, gY - 22, 3, 18).fill({ color: 0x6a7080, alpha: 0.7 })
+    }
+    rail.rect(0, gY - 22, W, 2).fill({ color: 0x8a90a0, alpha: 0.55 })
+    // 水波光點粒子錨點（靜態裝飾）
+    for (let i = 0; i < 15; i++) {
+      rail.circle(Math.random() * W, waterTop + 6 + Math.random() * 16, 1)
+        .fill({ color: 0xffffff, alpha: 0.2 + Math.random() * 0.25 })
+    }
+    this.midLayer.addChild(rail)
+  }
+
+  /**
+   * 傳統巷弄／老街（阿嬤）：低矮舊公寓、鐵窗、電線桿、溫黃路燈、廟角剪影。
+   */
+  private _buildTraditionalAlley(W: number, H: number, gY: number, bg: ChaseTheme['background']) {
+    const far = new PIXI.Graphics()
+    // 遠處廟或騎樓輪廓
+    far.rect(W * 0.7, gY - 55, 80, 55).fill({ color: bg.farLayer, alpha: 0.85 })
+    far.poly([
+      W * 0.68, gY - 52,
+      W * 0.74, gY - 78,
+      W * 0.82, gY - 52,
+    ]).fill({ color: bg.farLayer, alpha: 0.9 })
+    this.bgLayer.addChild(far)
+
+    const mid = new PIXI.Graphics()
+    // 兩側低矮公寓塊
+    let x = 0
+    while (x < W) {
+      const bw = 55 + Math.random() * 35
+      const floors = 2 + Math.floor(Math.random() * 2)
+      const bh = 36 + floors * 22
+      mid.rect(x, gY - bh, bw, bh).fill({ color: bg.midLayer, alpha: 0.95 })
+      // 鐵窗格
+      for (let f = 0; f < floors; f++) {
+        const wy = gY - 18 - f * 22
+        mid.rect(x + 8, wy - 12, 14, 12).stroke({ color: 0x4a4038, width: 1, alpha: 0.6 })
+        mid.rect(x + 28, wy - 12, 14, 12).stroke({ color: 0x4a4038, width: 1, alpha: 0.6 })
+        // 暖燈窗
+        if (Math.random() > 0.4) {
+          mid.rect(x + 10, wy - 10, 10, 8).fill({ color: 0xffe4a0, alpha: 0.3 })
+        }
+      }
+      // 空調／水塔小塊
+      if (Math.random() > 0.5) {
+        mid.rect(x + bw * 0.3, gY - bh - 6, 16, 6).fill({ color: bg.farLayer, alpha: 0.7 })
+      }
+      x += bw + 3
+    }
+    // 電線桿 + 橫線
+    for (const px of [W * 0.2, W * 0.55, W * 0.85]) {
+      mid.rect(px, gY - 85, 4, 85).fill({ color: 0x3a3530, alpha: 0.8 })
+      mid.moveTo(px, gY - 80).lineTo(px + 80, gY - 70)
+        .stroke({ color: 0x2a2820, width: 1, alpha: 0.5 })
+    }
+    // 路邊攤殘影（矮桌＋暖光）
+    mid.roundRect(W * 0.4, gY - 14, 36, 12, 2).fill({ color: 0x3a3020, alpha: 0.7 })
+    for (let r = 16; r > 0; r -= 4) {
+      mid.circle(W * 0.4 + 18, gY - 20, r).fill({ color: bg.lamp, alpha: (16 - r) / 16 * 0.05 })
+    }
+    this.midLayer.addChild(mid)
+  }
+
+  private _initUfoLights(W: number, gY: number, accent: number) {
+    for (let i = 0; i < 12; i++) {
+      const g = new PIXI.Graphics()
+      for (let r = 8; r > 0; r -= 2) {
+        g.circle(0, 0, r).fill({ color: accent, alpha: (8 - r) / 8 * 0.1 })
+      }
+      g.circle(0, 0, 1.8).fill({ color: 0xccfff5, alpha: 0.9 })
+      g.x = Math.random() * W
+      g.y = gY * 0.15 + Math.random() * gY * 0.45
+      g.alpha = 0.5 + Math.random() * 0.4
+      this.bgLayer.addChild(g)
+      this.ambientParticles.push({
+        g,
+        vx: (Math.random() - 0.5) * 6,
+        vy: (Math.random() - 0.5) * 4,
+        life: 6,
+        maxLife: 6,
+        baseAlpha: g.alpha,
+      })
+    }
+  }
+
+  private _initDust(W: number, gY: number) {
+    for (let i = 0; i < 20; i++) {
+      const g = new PIXI.Graphics()
+      g.ellipse(0, 0, 6 + Math.random() * 10, 2 + Math.random() * 3)
+        .fill({ color: 0xc4a574, alpha: 0.25 })
+      g.x = Math.random() * W
+      g.y = gY - 10 + Math.random() * 20
+      this.midLayer.addChild(g)
+      this.leafParticles.push({
+        g,
+        vx: 40 + Math.random() * 50,
+        vy: (Math.random() - 0.5) * 8,
+        life: 5,
+        maxLife: 5,
+        baseAlpha: 0.25,
       })
     }
   }

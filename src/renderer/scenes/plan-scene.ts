@@ -96,19 +96,27 @@ export class PlanScene extends PIXI.Container {
     this.addChild(themeTitle)
 
     this.themeBtns = []
-    const themeY = 118
+    const chipW = 108
+    const chipGap = 8
+    const themeStartY = 118
     let themeX = 40
+    let themeY = themeStartY
+    const themeMaxX = W - 160
     for (const t of THEME_LIST) {
       const btn = this._makeThemeChip(t, () => {
         this.selectedThemeId = t.id
         this._refreshThemeSelection()
         this._updateDetail()
       })
+      if (themeX + chipW > themeMaxX) {
+        themeX = 40
+        themeY += 42
+      }
       btn.root.x = themeX
       btn.root.y = themeY
       this.addChild(btn.root)
       this.themeBtns.push(btn)
-      themeX += 128
+      themeX += chipW + chipGap
     }
     this._refreshThemeSelection()
 
@@ -119,7 +127,7 @@ export class PlanScene extends PIXI.Container {
     const cardW = (listW - gap * (cols - 1)) / cols
     const cardH = 88
     const startX = 40
-    const startY = 168
+    const startY = themeY + 52
 
     PLANS.forEach((plan, i) => {
       const col = i % cols
@@ -264,8 +272,8 @@ export class PlanScene extends PIXI.Container {
   }
 
   private _makeThemeChip(theme: ChaseTheme, onClick: () => void): UiButton {
-    const w = 118
-    const h = 36
+    const w = 108
+    const h = 34
     const root = new PIXI.Container()
     root.eventMode = 'static'
     root.cursor = 'pointer'
@@ -275,7 +283,7 @@ export class PlanScene extends PIXI.Container {
 
     const label = new PIXI.Text({
       text: theme.label,
-      style: textStyle({ size: 11, color: Theme.text.primary, weight: '600', align: 'center' }),
+      style: textStyle({ size: 10, color: Theme.text.primary, weight: '600', align: 'center' }),
     })
     label.anchor.set(0.5)
     label.x = w / 2

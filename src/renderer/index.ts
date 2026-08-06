@@ -26,7 +26,7 @@ let screen: Screen = 'menu'
 let bleConnected = false
 let bleName = ''
 
-// URL 或預設主題：?theme=shiba|bear|godzilla|redlady
+// URL：?theme=<id> 例 ambulance|firetruck|bikini|foodpanda|grandma|…
 const bootParams = new URLSearchParams(location.search)
 let currentThemeId = resolveThemeId(bootParams.get('theme'))
 
@@ -187,7 +187,7 @@ window.addEventListener('keydown', (e) => {
 
 // ── Boot ─────────────────────────────────────────────────
 
-// 開發除錯：?screen=plan|chase&theme=shiba|bear|godzilla|redlady
+// 開發除錯：?screen=plan|chase&theme=<themeId>
 const bootScreen = bootParams.get('screen')
 if (bootScreen === 'plan') {
   showPlan()

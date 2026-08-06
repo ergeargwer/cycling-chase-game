@@ -172,7 +172,7 @@ export class MenuScene extends PIXI.Container {
 
     // 底部版本
     const ver = new PIXI.Text({
-      text: 'v1.2  ·  智慧騎行 追逐模式',
+      text: 'v1.3  ·  智慧騎行 追逐模式',
       style: textStyle({ size: 11, color: Theme.text.dim, align: 'center' }),
     })
     ver.anchor.set(0.5, 1)
