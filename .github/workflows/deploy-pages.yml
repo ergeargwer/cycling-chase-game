@@ -1,0 +1,58 @@
+# 部署網頁版（模擬模式）到 GitHub Pages
+# Electron / BLE 僅限本機；線上以瀏覽器 + 模擬功率遊玩
+
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # 略過 electron-rebuild / native BLE（網頁版不需要）
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      # 僅安裝渲染層執行時（避免拉取完整 electron 可選，但 package 仍含 electron）
+      - name: Build web
+        run: npm run build:web
+        env:
+          # project site: https://<user>.github.io/cycling-chase-game/
+          VITE_BASE: /cycling-chase-game/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

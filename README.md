@@ -2,8 +2,27 @@
 
 以遊戲化方式進行室內騎行功率訓練。維持目標功率，甩開後方追逐者；功率不足時距離縮短，緊張感隨之升高。路線含**平路／上坡／下坡**，並支援 **12 種追逐者主題**（角色 Sprite Sheet + 專屬夜間場景）。
 
-**平台：** Electron 桌面應用（Raspberry Pi 5 ARM64 / Windows x64）  
+**平台：** Electron 桌面應用（Raspberry Pi 5 ARM64 / Windows x64）＋ **瀏覽器網頁版（GitHub Pages）**  
 **版本：** 1.3.0
+
+### 線上試玩（GitHub Pages）
+
+> 網址（推送 `main` 並完成 Actions 部署後可用）：  
+> **https://ergeargwer.github.io/cycling-chase-game/**
+
+- 線上為**模擬功率模式**（不需騎行台；瀏覽器無法使用 Electron BLE）
+- 主題切換範例：  
+  `https://ergeargwer.github.io/cycling-chase-game/?theme=bear`  
+  `https://ergeargwer.github.io/cycling-chase-game/?screen=chase&theme=firetruck`
+- 部署：push 到 `main` 會觸發 [Deploy GitHub Pages](.github/workflows/deploy-pages.yml)
+
+本機僅開網頁版：
+
+```bash
+npm install
+npm run dev:web
+# 開啟 http://127.0.0.1:5173
+```
 
 ---
 
@@ -179,13 +198,12 @@ cycling-chase-game/
 
 ```bash
 npm install
+
+# Electron 桌面（含 BLE 能力）
 npm run dev
-```
 
-僅預覽 renderer：
-
-```bash
-npx vite --host 127.0.0.1 --port 5173
+# 僅瀏覽器預覽（模擬模式，等同線上版）
+npm run dev:web
 ```
 
 除錯：`?screen=plan|chase`、`?theme=<id>`
@@ -193,7 +211,13 @@ npx vite --host 127.0.0.1 --port 5173
 ### 建置
 
 ```bash
+# 完整 Electron 建置
 npm run build
+
+# 僅網頁版（GitHub Pages / 靜態託管）
+npm run build:web
+# 輸出：dist/   （Pages 用 VITE_BASE=/cycling-chase-game/）
+
 npm run dist:pi    # Linux arm64 AppImage
 npm run dist:win   # Windows x64
 ```

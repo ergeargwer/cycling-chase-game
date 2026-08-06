@@ -4,3 +4,7 @@ dist-electron/
 release/
 assets/_sprite-preview/
 *.log
+
+# local opaque backups from bg keying
+assets/*.opaque.png
+assets/*.bak
