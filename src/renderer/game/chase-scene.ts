@@ -1194,8 +1194,10 @@ export class ChaseScene extends PIXI.Container {
     this.chaserAtkSprite = new PIXI.AnimatedSprite(
       this._makeSheetFrames(baseTexture, cfg.attackFrames))
 
-    const avgH = cfg.runFrames.reduce((a, f) => a + f.h, 0) / cfg.runFrames.length
+    // 以幀平均像素高對齊 displayHeight（騎士 RIDER_DISPLAY_H=320；人物~300、車輛~400+）
+    const avgH = cfg.runFrames.reduce((a, f) => a + f.h, 0) / Math.max(1, cfg.runFrames.length)
     this.chaserBaseScale = (cfg.displayHeight / avgH) * cfg.scaleMul
+
     const groundY = this._groundY()
     const animMul = this.chaseTheme.behavior.animSpeedMul
 

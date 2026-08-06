@@ -31,6 +31,11 @@ export interface ChaserConfig {
   runFrames: FrameRect[]
   /** 攻擊／吼叫／特殊幀（對應原本吠叫） */
   attackFrames: FrameRect[]
+  /**
+   * 畫面顯示高度（px）。騎士 RIDER_DISPLAY_H = 320。
+   * 人物類建議 280–320；車輛類建議 380–450。
+   * chase-scene：scale = (displayHeight / 幀平均高) * scaleMul
+   */
   displayHeight: number
   /** 可選：整體著色（0xffffff = 原色） */
   tint: number
@@ -332,7 +337,7 @@ export const THEMES: Record<string, ChaseTheme> = {
       assetAlias: 'chaser-shiba',
       runFrames: DOG_RUN_FRAMES,
       attackFrames: DOG_ATTACK_FRAMES,
-      displayHeight: 140,
+      displayHeight: 300,
       tint: 0xffffff,
       scaleMul: 1,
     },
@@ -391,7 +396,7 @@ export const THEMES: Record<string, ChaseTheme> = {
       assetAlias: 'chaser-bear',
       runFrames: BEAR_RUN_FRAMES,
       attackFrames: BEAR_ATTACK_FRAMES,
-      displayHeight: 175,
+      displayHeight: 310,
       tint: 0xffffff,
       scaleMul: 1,
     },
@@ -450,7 +455,7 @@ export const THEMES: Record<string, ChaseTheme> = {
       assetAlias: 'chaser-godzilla',
       runFrames: GODZILLA_RUN_FRAMES,
       attackFrames: GODZILLA_ATTACK_FRAMES,
-      displayHeight: 185,
+      displayHeight: 320,
       tint: 0xffffff,
       scaleMul: 1,
     },
@@ -513,7 +518,7 @@ export const THEMES: Record<string, ChaseTheme> = {
       assetAlias: 'chaser-redlady',
       runFrames: REDLADY_RUN_FRAMES,
       attackFrames: REDLADY_ATTACK_FRAMES,
-      displayHeight: 175,
+      displayHeight: 300,
       tint: 0xffffff,
       scaleMul: 1,
     },
@@ -576,7 +581,7 @@ export const THEMES: Record<string, ChaseTheme> = {
       assetAlias: 'chaser-jiangshi',
       runFrames: JIANGSHI_RUN_FRAMES,
       attackFrames: JIANGSHI_ATTACK_FRAMES,
-      displayHeight: 180,
+      displayHeight: 300,
       tint: 0xffffff,
       scaleMul: 1,
     },
@@ -635,7 +640,7 @@ export const THEMES: Record<string, ChaseTheme> = {
       assetAlias: 'chaser-alien',
       runFrames: ALIEN_RUN_FRAMES,
       attackFrames: ALIEN_ATTACK_FRAMES,
-      displayHeight: 170,
+      displayHeight: 290,
       tint: 0xffffff,
       scaleMul: 1,
     },
@@ -694,7 +699,7 @@ export const THEMES: Record<string, ChaseTheme> = {
       assetAlias: 'chaser-dumptruck',
       runFrames: DUMPTRUCK_RUN_FRAMES,
       attackFrames: DUMPTRUCK_ATTACK_FRAMES,
-      displayHeight: 200,
+      displayHeight: 430,
       tint: 0xffffff,
       scaleMul: 1,
     },
@@ -753,7 +758,7 @@ export const THEMES: Record<string, ChaseTheme> = {
       assetAlias: 'chaser-foodpanda',
       runFrames: FOODPANDA_RUN_FRAMES,
       attackFrames: FOODPANDA_ATTACK_FRAMES,
-      displayHeight: 175,
+      displayHeight: 300,
       tint: 0xffffff,
       scaleMul: 1,
     },
@@ -812,7 +817,7 @@ export const THEMES: Record<string, ChaseTheme> = {
       assetAlias: 'chaser-grandma',
       runFrames: GRANDMA_RUN_FRAMES,
       attackFrames: GRANDMA_ATTACK_FRAMES,
-      displayHeight: 170,
+      displayHeight: 295,
       tint: 0xffffff,
       scaleMul: 1,
     },
@@ -871,7 +876,7 @@ export const THEMES: Record<string, ChaseTheme> = {
       assetAlias: 'chaser-ambulance',
       runFrames: AMBULANCE_RUN_FRAMES,
       attackFrames: AMBULANCE_ATTACK_FRAMES,
-      displayHeight: 190,
+      displayHeight: 400,
       tint: 0xffffff,
       scaleMul: 1,
     },
@@ -930,7 +935,7 @@ export const THEMES: Record<string, ChaseTheme> = {
       assetAlias: 'chaser-firetruck',
       runFrames: FIRETRUCK_RUN_FRAMES,
       attackFrames: FIRETRUCK_ATTACK_FRAMES,
-      displayHeight: 200,
+      displayHeight: 440,
       tint: 0xffffff,
       scaleMul: 1,
     },
@@ -989,7 +994,7 @@ export const THEMES: Record<string, ChaseTheme> = {
       assetAlias: 'chaser-bikini',
       runFrames: BIKINI_RUN_FRAMES,
       attackFrames: BIKINI_ATTACK_FRAMES,
-      displayHeight: 175,
+      displayHeight: 300,
       tint: 0xffffff,
       scaleMul: 1,
     },
