@@ -1,13 +1,48 @@
 // 追逐遊戲主場景 — PixiJS v8
-// 完整場景：背景、路面、路燈、騎士、柴犬、汗珠粒子、商業級 HUD
+// 完整場景：可變坡度地形、路面、路燈、騎士、柴犬、汗珠、地形簡圖、商業級 HUD
 
 import * as PIXI from 'pixi.js'
 import { GameState } from './game-state'
 import { GameHud } from './hud'
-import { Theme } from '../ui/theme'
+import { Theme, textStyle } from '../ui/theme'
 
 // Sprite Sheet 規格（緊密裁切，去除格線內空白）
 interface FrameRect { x: number; y: number; w: number; h: number }
+
+// ── 地形資料 ─────────────────────────────────────────────
+
+/** 單一地形段落：progress 0~1，高度 0~1（0=谷底，1=最高） */
+interface TerrainSegment {
+  start: number
+  end: number
+  h0: number
+  h1: number
+  label: string
+}
+
+/**
+ * 整段訓練的海拔剖面（比例可依計畫重用）。
+ * 段落銜接處高度連續，避免折線突跳。
+ */
+const TERRAIN_PROFILE: TerrainSegment[] = [
+  { start: 0.00, end: 0.20, h0: 0.28, h1: 0.28, label: '平路' },
+  { start: 0.20, end: 0.40, h0: 0.28, h1: 0.55, label: '緩上坡' },
+  { start: 0.40, end: 0.55, h0: 0.55, h1: 0.92, label: '陡上坡' },
+  { start: 0.55, end: 0.75, h0: 0.92, h1: 0.22, label: '下坡' },
+  { start: 0.75, end: 1.00, h0: 0.22, h1: 0.26, label: '平路' },
+]
+
+/** 畫面橫向可見的進度跨度（用於表現局部坡度） */
+const TERRAIN_SCREEN_SPAN = 0.10
+/** 海拔 0→1 對應的最大垂直像素位移 */
+const TERRAIN_MAX_ELEV_PX = 96
+/** 自由騎乘時地形循環週期（秒） */
+const FREE_RIDE_TERRAIN_CYCLE_SEC = 20 * 60
+/** 地形簡圖尺寸 */
+const MINIMAP_W = 200
+const MINIMAP_H = 58
+const MINIMAP_PAD_X = 10
+const MINIMAP_PAD_Y = 10
 
 // rider.png 1536×600 — row0 正常 / row1 緊張，各 6 格（面向右）
 const RIDER_NORMAL_FRAMES: FrameRect[] = [
@@ -68,6 +103,10 @@ export class ChaseScene extends PIXI.Container {
   private hudLayer:  PIXI.Container = new PIXI.Container()
 
   // 路面元素
+  private roadBody!:   PIXI.Graphics
+  private roadEdge!:   PIXI.Graphics
+  private roadShade!:  PIXI.Graphics
+  private roadGrass!:  PIXI.Graphics
   private roadDashes:  PIXI.Graphics[] = []
   private lampSprites: PIXI.Container[] = []
   private lampXs:      number[]  = []
@@ -91,6 +130,15 @@ export class ChaseScene extends PIXI.Container {
   private dangerAlpha:    number = 0
   private riderBaseScale: number = 1
   private dogBaseScale:   number = 1
+
+  // 地形簡圖
+  private minimapRoot!:   PIXI.Container
+  private minimapBg!:     PIXI.Graphics
+  private minimapLine!:   PIXI.Graphics
+  private minimapFill!:   PIXI.Graphics
+  private minimapMarker!: PIXI.Graphics
+  private minimapLabel!:  PIXI.Text
+  private minimapGrade!:  PIXI.Text
 
   // 月亮、星星
   private moonGfx!: PIXI.Graphics
@@ -135,9 +183,13 @@ export class ChaseScene extends PIXI.Container {
     this._buildSweat()
     this._buildVignette()
     this._buildHud()
+    this._buildTerrainMinimap()
     this._buildDangerOverlay()
 
+    const progress = this._getWorkoutProgress()
+    this._redrawRoadSurface(progress)
     this.dogScreenX = this._calcTargetDogX()
+    this._updateTerrainMinimap(progress)
     this.ready = true
   }
 
@@ -156,14 +208,95 @@ export class ChaseScene extends PIXI.Container {
     return this.app.screen.width * RIDER_X_RATIO
   }
 
-  private _roadTop(): number {
+  /** 基準路面頂（無坡度時） */
+  private _roadTopBase(): number {
     return this.app.screen.height * ROAD_TOP_RATIO
   }
 
-  private _groundY(): number {
+  /** 基準著地 Y（無坡度時） */
+  private _baseGroundY(): number {
     const H = this.app.screen.height
     const roadH = H * (1 - ROAD_TOP_RATIO)
-    return this._roadTop() + roadH * GROUND_IN_ROAD
+    return this._roadTopBase() + roadH * GROUND_IN_ROAD
+  }
+
+  /**
+   * 訓練進度 0~1。
+   * 有時限計畫：依總時長；自由騎乘：週期循環以持續有坡度變化。
+   */
+  private _getWorkoutProgress(): number {
+    const finite = this.state.plan.segments.filter(s => s.durationMin < 999)
+    const totalMin = finite.reduce((a, s) => a + s.durationMin, 0)
+    if (totalMin <= 0) {
+      const t = this.state.totalElapsedSec % FREE_RIDE_TERRAIN_CYCLE_SEC
+      return t / FREE_RIDE_TERRAIN_CYCLE_SEC
+    }
+    return Math.max(0, Math.min(1, this.state.totalElapsedSec / (totalMin * 60)))
+  }
+
+  private _smoothstep(t: number): number {
+    const x = Math.max(0, Math.min(1, t))
+    return x * x * (3 - 2 * x)
+  }
+
+  /**
+   * 依訓練進度回傳正規化海拔（0~1）。
+   * 段落內以 smoothstep 插值，整條路線平滑起伏。
+   */
+  private _getTerrainHeight(progress: number): number {
+    const p = Math.max(0, Math.min(1, progress))
+    const segs = TERRAIN_PROFILE
+    if (p <= segs[0].start) return segs[0].h0
+    if (p >= segs[segs.length - 1].end) return segs[segs.length - 1].h1
+
+    for (const seg of segs) {
+      if (p >= seg.start && p <= seg.end) {
+        const t = (p - seg.start) / Math.max(1e-6, seg.end - seg.start)
+        const e = this._smoothstep(t)
+        return seg.h0 + (seg.h1 - seg.h0) * e
+      }
+    }
+    return segs[segs.length - 1].h1
+  }
+
+  /** 目前進度所在地形段落標籤 */
+  private _getTerrainLabel(progress: number): string {
+    const p = Math.max(0, Math.min(1, progress))
+    for (const seg of TERRAIN_PROFILE) {
+      if (p >= seg.start && p <= seg.end) return seg.label
+    }
+    return TERRAIN_PROFILE[TERRAIN_PROFILE.length - 1].label
+  }
+
+  /**
+   * 局部坡度（正規化高度對 progress 的導數近似，單位：高度/進度）。
+   * 正 = 上坡，負 = 下坡。
+   */
+  private _getTerrainGrade(progress: number): number {
+    const eps = 0.008
+    const h0 = this._getTerrainHeight(progress - eps)
+    const h1 = this._getTerrainHeight(progress + eps)
+    return (h1 - h0) / (2 * eps)
+  }
+
+  /** 畫面 x 對應的「路線進度」（以騎士為當前點，左右展開局部剖面） */
+  private _progressAtScreenX(screenX: number): number {
+    const W = this.app.screen.width
+    const riderX = this._riderX()
+    const base = this._getWorkoutProgress()
+    return Math.max(0, Math.min(1,
+      base + ((screenX - riderX) / Math.max(1, W)) * TERRAIN_SCREEN_SPAN))
+  }
+
+  /** 某螢幕 x 上的著地 Y（含坡度） */
+  private _groundYAt(screenX: number): number {
+    const elev = this._getTerrainHeight(this._progressAtScreenX(screenX))
+    return this._baseGroundY() - elev * TERRAIN_MAX_ELEV_PX
+  }
+
+  /** 騎士位置著地 Y */
+  private _groundY(): number {
+    return this._groundYAt(this._riderX())
   }
 
   // ── 建構各層 ──────────────────────────────────────────
@@ -173,12 +306,10 @@ export class ChaseScene extends PIXI.Container {
     const H = this.app.screen.height
     const gY = H * 0.60
 
-    // 天空漸層（多層模擬）
     const sky = new PIXI.Graphics()
     sky.rect(0, 0, W, gY).fill({ color: Theme.scene.sky })
     this.bgLayer.addChild(sky)
 
-    // 頂部微藍光
     const haze = new PIXI.Graphics()
     for (let i = 0; i < 8; i++) {
       const y = (gY / 8) * i
@@ -187,7 +318,6 @@ export class ChaseScene extends PIXI.Container {
     }
     this.bgLayer.addChild(haze)
 
-    // 月亮 + 光暈
     this.moonGfx = new PIXI.Graphics()
     for (let r = 55; r > 22; r -= 6) {
       this.moonGfx.circle(0, 0, r).fill({ color: 0xe8e0c0, alpha: (55 - r) / 55 * 0.05 })
@@ -200,7 +330,6 @@ export class ChaseScene extends PIXI.Container {
     this.moonGfx.y = H * 0.10
     this.bgLayer.addChild(this.moonGfx)
 
-    // 星星
     for (let i = 0; i < 55; i++) {
       const g = new PIXI.Graphics()
       const r = Math.random() * 1.4 + 0.4
@@ -212,14 +341,13 @@ export class ChaseScene extends PIXI.Container {
       this.stars.push({ g, baseAlpha: g.alpha, phase: Math.random() * Math.PI * 2 })
     }
 
-    // 遠山剪影
     const mtn1 = new PIXI.Graphics()
     const peaks1: number[] = [
       0, gY,
       W*0.06, H*0.38, W*0.16, H*0.26, W*0.26, H*0.41,
       W*0.37, H*0.20, W*0.47, H*0.34, W*0.58, H*0.23,
       W*0.68, H*0.37, W*0.78, H*0.28, W*0.88, H*0.40,
-      W, H*0.35, W, gY
+      W, H*0.35, W, gY,
     ]
     mtn1.poly(peaks1).fill({ color: Theme.scene.mountain1 })
     this.bgLayer.addChild(mtn1)
@@ -229,7 +357,7 @@ export class ChaseScene extends PIXI.Container {
       0, gY,
       W*0.08, H*0.44, W*0.20, H*0.35, W*0.32, H*0.46,
       W*0.42, H*0.32, W*0.55, H*0.44, W*0.65, H*0.36,
-      W*0.78, H*0.48, W*0.88, H*0.38, W, H*0.52, W, gY
+      W*0.78, H*0.48, W*0.88, H*0.38, W, H*0.52, W, gY,
     ]
     mtn2.poly(peaks2).fill({ color: Theme.scene.mountain2 })
     this.bgLayer.addChild(mtn2)
@@ -237,35 +365,74 @@ export class ChaseScene extends PIXI.Container {
 
   private _buildRoad() {
     const W = this.app.screen.width
-    const H = this.app.screen.height
-    const gY = H * 0.60
-    const roadH = H - gY
 
-    const road = new PIXI.Graphics()
-    // 路面主體
-    road.rect(0, gY, W, roadH).fill({ color: Theme.scene.road })
-    // 路邊細線
-    road.rect(0, gY, W, 2).fill({ color: 0x3a3a3a })
-    // 近景暗化
-    road.rect(0, gY + roadH * 0.75, W, roadH * 0.25).fill({ color: 0x000000, alpha: 0.18 })
-    // 草邊
-    road.rect(0, H - 14, W, 14).fill({ color: Theme.scene.grass })
-    this.roadLayer.addChild(road)
+    this.roadBody  = new PIXI.Graphics()
+    this.roadEdge  = new PIXI.Graphics()
+    this.roadShade = new PIXI.Graphics()
+    this.roadGrass = new PIXI.Graphics()
+    this.roadLayer.addChild(this.roadBody, this.roadEdge, this.roadShade, this.roadGrass)
 
-    // 虛線
+    // 虛線（y 每幀依地形更新）
     for (let x = 0; x < W + 160; x += 160) {
       const dash = new PIXI.Graphics()
       dash.roundRect(0, 0, 60, 3, 1.5).fill({ color: 0x8a7040, alpha: 0.65 })
-      dash.y = gY + roadH * 0.42
       this.roadLayer.addChild(dash)
       this.roadDashes.push(dash)
     }
+
+    this._redrawRoadSurface(this._getWorkoutProgress())
+  }
+
+  /**
+   * 依目前進度重繪路面多邊形：頂緣跟隨局部海拔剖面，
+   * 形成可見的上坡／下坡梯形。
+   */
+  private _redrawRoadSurface(progress: number) {
+    const W = this.app.screen.width
+    const H = this.app.screen.height
+    const samples = Math.max(24, Math.ceil(W / 40))
+    const topPts: number[] = []
+
+    for (let i = 0; i <= samples; i++) {
+      const x = (i / samples) * W
+      // 與 progress 參數對齊：以騎士為錨的局部剖面
+      const localP = Math.max(0, Math.min(1,
+        progress + ((x - this._riderX()) / Math.max(1, W)) * TERRAIN_SCREEN_SPAN))
+      const y = this._baseGroundY() - this._getTerrainHeight(localP) * TERRAIN_MAX_ELEV_PX
+      // 路面頂略高於著地線
+      const surfaceY = y - 6
+      topPts.push(x, surfaceY)
+    }
+
+    // 路面主體：頂緣折線 → 右下 → 左下
+    const bodyPts: number[] = [...topPts, W, H, 0, H]
+    this.roadBody.clear()
+    this.roadBody.poly(bodyPts).fill({ color: Theme.scene.road })
+
+    // 路邊細線（頂緣）
+    this.roadEdge.clear()
+    this.roadEdge.moveTo(topPts[0], topPts[1])
+    for (let i = 2; i < topPts.length; i += 2) {
+      this.roadEdge.lineTo(topPts[i], topPts[i + 1])
+    }
+    this.roadEdge.stroke({ color: 0x4a4a4a, width: 2, alpha: 0.85 })
+
+    // 近景暗化帶（沿頂緣向下偏移）
+    this.roadShade.clear()
+    const shadePts: number[] = []
+    for (let i = 0; i < topPts.length; i += 2) {
+      shadePts.push(topPts[i], topPts[i + 1] + (H - topPts[i + 1]) * 0.55)
+    }
+    const shadePoly = [...shadePts, W, H, 0, H]
+    this.roadShade.poly(shadePoly).fill({ color: 0x000000, alpha: 0.16 })
+
+    // 草邊
+    this.roadGrass.clear()
+    this.roadGrass.rect(0, H - 14, W, 14).fill({ color: Theme.scene.grass })
   }
 
   private _buildLamps() {
     const W = this.app.screen.width
-    const H = this.app.screen.height
-    const gY = H * 0.60
 
     for (let x = 100; x < W + 100; x += 180) {
       const lamp = new PIXI.Container()
@@ -276,7 +443,6 @@ export class ChaseScene extends PIXI.Container {
       pole.roundRect(14, -78, 18, 8, 2).fill({ color: 0x6a6a6a })
       lamp.addChild(pole)
 
-      // 燈光暈
       const glow = new PIXI.Graphics()
       for (let r = 55; r > 0; r -= 5) {
         const a = (55 - r) / 55 * 0.14
@@ -284,13 +450,12 @@ export class ChaseScene extends PIXI.Container {
       }
       lamp.addChild(glow)
 
-      // 地面光斑
       const pool = new PIXI.Graphics()
       pool.ellipse(22, 4, 36, 8).fill({ color: Theme.scene.lamp, alpha: 0.06 })
       lamp.addChild(pool)
 
       lamp.x = x
-      lamp.y = gY
+      lamp.y = this._groundYAt(x)
       this.roadLayer.addChild(lamp)
       this.lampSprites.push(lamp)
       this.lampXs.push(x)
@@ -373,7 +538,6 @@ export class ChaseScene extends PIXI.Container {
     const W = this.app.screen.width
     const H = this.app.screen.height
     this.vignette = new PIXI.Graphics()
-    // 四邊柔和暗角，提升電影感
     const edge = Math.min(W, H) * 0.12
     this.vignette.rect(0, 0, W, edge).fill({ color: 0x000000, alpha: 0.25 })
     this.vignette.rect(0, H - edge, W, edge).fill({ color: 0x000000, alpha: 0.3 })
@@ -400,6 +564,144 @@ export class ChaseScene extends PIXI.Container {
     this.hudLayer.addChild(this.hud)
   }
 
+  // ── 地形簡圖（總體路程剖面）────────────────────────────
+
+  private _buildTerrainMinimap() {
+    const W = this.app.screen.width
+    this.minimapRoot = new PIXI.Container()
+
+    this.minimapBg = new PIXI.Graphics()
+    this.minimapBg
+      .roundRect(0, 0, MINIMAP_W, MINIMAP_H, 10)
+      .fill({ color: 0x0a0a18, alpha: 0.72 })
+      .stroke({ color: 0x22d3ee, alpha: 0.22, width: 1 })
+    this.minimapRoot.addChild(this.minimapBg)
+
+    const title = new PIXI.Text({
+      text: '路線剖面',
+      style: textStyle({ size: 10, color: Theme.text.dim, weight: '700', letterSpacing: 0.5 }),
+    })
+    title.x = MINIMAP_PAD_X
+    title.y = 4
+    this.minimapRoot.addChild(title)
+
+    this.minimapFill = new PIXI.Graphics()
+    this.minimapRoot.addChild(this.minimapFill)
+
+    this.minimapLine = new PIXI.Graphics()
+    this.minimapRoot.addChild(this.minimapLine)
+
+    this.minimapMarker = new PIXI.Graphics()
+    this.minimapRoot.addChild(this.minimapMarker)
+
+    this.minimapLabel = new PIXI.Text({
+      text: '',
+      style: textStyle({ size: 10, color: Theme.accent.cyan, weight: '600' }),
+    })
+    this.minimapLabel.anchor.set(1, 0)
+    this.minimapLabel.x = MINIMAP_W - MINIMAP_PAD_X
+    this.minimapLabel.y = 4
+    this.minimapRoot.addChild(this.minimapLabel)
+
+    this.minimapGrade = new PIXI.Text({
+      text: '',
+      style: textStyle({ size: 10, color: Theme.text.muted, weight: '600', mono: true }),
+    })
+    this.minimapGrade.anchor.set(0, 1)
+    this.minimapGrade.x = MINIMAP_PAD_X
+    this.minimapGrade.y = MINIMAP_H - 4
+    this.minimapRoot.addChild(this.minimapGrade)
+
+    // 右上：段落時間軸下方，避開 BLE／暫停鈕
+    this.minimapRoot.x = W - MINIMAP_W - 16
+    this.minimapRoot.y = 138
+    this.hudLayer.addChild(this.minimapRoot)
+
+    this._drawMinimapProfile()
+    this._updateTerrainMinimap(this._getWorkoutProgress())
+  }
+
+  /** 靜態剖面曲線（整段訓練） */
+  private _drawMinimapProfile() {
+    const left = MINIMAP_PAD_X
+    const right = MINIMAP_W - MINIMAP_PAD_X
+    const top = 18
+    const bottom = MINIMAP_H - 16
+    const chartW = right - left
+    const chartH = bottom - top
+    const steps = 48
+
+    const pts: number[] = []
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps
+      const h = this._getTerrainHeight(t)
+      const x = left + t * chartW
+      // 高度高 → 圖上 y 較小
+      const y = bottom - h * chartH
+      pts.push(x, y)
+    }
+
+    this.minimapFill.clear()
+    const fillPts = [...pts, right, bottom, left, bottom]
+    this.minimapFill.poly(fillPts).fill({ color: 0x22d3ee, alpha: 0.08 })
+
+    this.minimapLine.clear()
+    this.minimapLine.moveTo(pts[0], pts[1])
+    for (let i = 2; i < pts.length; i += 2) {
+      this.minimapLine.lineTo(pts[i], pts[i + 1])
+    }
+    this.minimapLine.stroke({ color: 0xcbd5e1, width: 1.6, alpha: 0.9 })
+
+    // 底線
+    this.minimapLine.moveTo(left, bottom).lineTo(right, bottom)
+      .stroke({ color: 0x64748b, width: 1, alpha: 0.35 })
+  }
+
+  /** 更新紅點位置與坡度標籤 */
+  private _updateTerrainMinimap(progress: number) {
+    if (!this.minimapMarker) return
+
+    const left = MINIMAP_PAD_X
+    const right = MINIMAP_W - MINIMAP_PAD_X
+    const top = 18
+    const bottom = MINIMAP_H - 16
+    const chartW = right - left
+    const chartH = bottom - top
+    const p = Math.max(0, Math.min(1, progress))
+    const h = this._getTerrainHeight(p)
+    const mx = left + p * chartW
+    const my = bottom - h * chartH
+
+    this.minimapMarker.clear()
+    // 柔光
+    for (let r = 10; r >= 4; r -= 2) {
+      this.minimapMarker.circle(mx, my, r)
+        .fill({ color: 0xef4444, alpha: 0.08 * (11 - r) })
+    }
+    this.minimapMarker.circle(mx, my, 4).fill({ color: 0xef4444, alpha: 0.95 })
+    this.minimapMarker.circle(mx, my, 1.6).fill({ color: 0xfff1f2, alpha: 0.95 })
+
+    // 垂直虛線感：細線連到底
+    this.minimapMarker.moveTo(mx, my + 5).lineTo(mx, bottom)
+      .stroke({ color: 0xef4444, width: 1, alpha: 0.25 })
+
+    this.minimapLabel.text = this._getTerrainLabel(p)
+
+    const grade = this._getTerrainGrade(p)
+    // 轉成近似百分比坡度顯示（視覺量級）
+    const pct = Math.round(grade * 8)
+    if (Math.abs(pct) < 1) {
+      this.minimapGrade.text = '坡度  0%'
+      this.minimapGrade.style.fill = Theme.text.muted
+    } else if (pct > 0) {
+      this.minimapGrade.text = `上坡  +${pct}%`
+      this.minimapGrade.style.fill = Theme.status.warning
+    } else {
+      this.minimapGrade.text = `下坡  ${pct}%`
+      this.minimapGrade.style.fill = Theme.accent.cyan
+    }
+  }
+
   private _buildDangerOverlay() {
     this.dangerOverlay = new PIXI.Graphics()
     this.dangerOverlay.alpha = 0
@@ -411,9 +713,15 @@ export class ChaseScene extends PIXI.Container {
   update(dt: number) {
     if (!this.ready) return
 
+    const progress = this._getWorkoutProgress()
+    const riderGround = this._groundY()
+
     // HUD 在暫停/完成時仍需更新（顯示覆蓋層）
     if (this.state.isPaused || this.state.isFinished) {
-      this.hud?.update(dt, this.dogScreenX, this._groundY(), DOG_DISPLAY_H)
+      this._redrawRoadSurface(progress)
+      this._layoutTerrainProps(progress)
+      this._updateTerrainMinimap(progress)
+      this.hud?.update(dt, this.dogScreenX, riderGround, DOG_DISPLAY_H)
       return
     }
     if (!this.state.isRunning) return
@@ -422,66 +730,122 @@ export class ChaseScene extends PIXI.Container {
     const speed      = Math.max(1.5, this.state.currentPower / 25)
     this.roadOffset  = (this.roadOffset + speed * dt * 80) % 160
 
+    // 路面剖面隨進度變化
+    this._redrawRoadSurface(progress)
+
+    // 虛線滾動 + 貼合地形
     this.roadDashes.forEach((d, i) => {
       d.x = (i * 160 - this.roadOffset + 160 * 10) % (this.roadDashes.length * 160)
         - 160
+      d.y = this._groundYAt(d.x + 30) + 14
     })
 
+    // 路燈橫移 + 貼合地形
     for (let i = 0; i < this.lampSprites.length; i++) {
       this.lampXs[i] -= speed * dt * 80
       if (this.lampXs[i] < -20) this.lampXs[i] = this.app.screen.width + 80
       this.lampSprites[i].x = this.lampXs[i]
+      this.lampSprites[i].y = this._groundYAt(this.lampXs[i])
     }
 
     this._updateDogX(dt)
-    this._updateRider()
+    this._updateRider(progress)
     this._updateDog()
     this._updateShake(dt)
     this._updateSweat(dt)
+    this._updateTerrainMinimap(progress)
     this.hud?.update(dt, this.dogScreenX, this._groundY(), DOG_DISPLAY_H)
     this._updateStars()
   }
 
+  /** 暫停時仍讓虛線／燈對齊當前地形 */
+  private _layoutTerrainProps(_progress: number) {
+    this.roadDashes.forEach((d) => {
+      d.y = this._groundYAt(d.x + 30) + 14
+    })
+    for (let i = 0; i < this.lampSprites.length; i++) {
+      this.lampSprites[i].y = this._groundYAt(this.lampXs[i])
+    }
+    const gy = this._groundY()
+    if (this.riderSprite) {
+      this.riderSprite.y = this.riderNervSprite.y = gy
+    }
+    if (this.dogRunSprite) {
+      const dogY = this._groundYAt(this.dogScreenX)
+      this.dogRunSprite.y = this.dogBarkSprite.y = dogY
+    }
+  }
+
+  /** 距離 0 → 貼近騎士左側；距離 MAX → 偏左遠方 */
   private _calcTargetDogX(): number {
     const riderX = this._riderX()
     const t = Math.max(0, Math.min(1, this.state.distance / GameState.MAX_DIST))
-    return riderX - 80 - t * (riderX - 80 + 100)
+    const nearX = riderX - 95
+    const farX  = -40
+    return nearX + t * (farX - nearX)
   }
 
   private _updateDogX(dt: number) {
-    if (this.state.dogState === 'resting') {
-      this.dogScreenX = -160
+    const state = this.state.dogState
+    const target = this._calcTargetDogX()
+
+    if (state === 'retreating') {
+      this.dogScreenX -= Math.max(420, Math.abs(this.dogScreenX) * 0.8 + 280) * dt
+      if (this.dogScreenX < -180) this.dogScreenX = -180
       return
     }
-    if (this.state.dogState === 'returning') {
-      this.dogScreenX += 900 * dt
-      const target = this._calcTargetDogX()
-      if (this.dogScreenX >= target) {
-        this.dogScreenX = target
-        this.state.dogState = 'chasing'
+
+    if (state === 'resting') {
+      if (this.dogScreenX > -180) {
+        this.dogScreenX -= 600 * dt
+      } else {
+        this.dogScreenX = -180
       }
       return
     }
-    const target = this._calcTargetDogX()
-    this.dogScreenX += (target - this.dogScreenX) * Math.min(1, dt * 2.5)
+
+    if (state === 'returning') {
+      if (this.dogScreenX < -150) this.dogScreenX = -150
+      const gap = target - this.dogScreenX
+      const speed = Math.max(520, Math.min(1100, 480 + gap * 1.8))
+      this.dogScreenX += speed * dt
+      if (this.dogScreenX >= target) {
+        this.dogScreenX = target
+        this.state.onReturnComplete()
+      }
+      return
+    }
+
+    const follow = Math.min(1, dt * 3.2)
+    this.dogScreenX += (target - this.dogScreenX) * follow
   }
 
-  private _updateRider() {
+  private _updateRider(progress: number) {
     const isNerv = this.state.isNervous
     const groundY = this._groundY()
     const riderX  = this._riderX()
 
     this.riderSprite.visible     = !isNerv
     this.riderNervSprite.visible =  isNerv
-    this.riderSprite.animationSpeed     = 8 / 60
-    this.riderNervSprite.animationSpeed = 10 / 60
+    const pedal = Math.max(6, Math.min(14, 7 + this.state.powerRatio * 5)) / 60
+    this.riderSprite.animationSpeed     = pedal
+    this.riderNervSprite.animationSpeed = pedal * 1.15
     this.riderSprite.x = this.riderNervSprite.x = riderX
     this.riderSprite.y = this.riderNervSprite.y = groundY
+
+    // 依局部坡度微傾（上坡後仰、下坡前傾）
+    const grade = this._getTerrainGrade(progress)
+    const tilt = Math.max(-0.12, Math.min(0.12, -grade * 0.04))
+    this.riderSprite.rotation = tilt
+    this.riderNervSprite.rotation = tilt
   }
 
   private _updateDog() {
-    const showBark = this.state.isDanger || this.state.dogState === 'returning'
-    const groundY = this._groundY()
+    const ds = this.state.dogState
+    const showBark = this.state.isDanger
+      || ds === 'returning'
+      || (ds === 'chasing' && this.state.isNervous && this.state.distance < 18)
+    const groundY = this._groundYAt(this.dogScreenX)
 
     this.dogRunSprite.x  = this.dogScreenX
     this.dogBarkSprite.x = this.dogScreenX
@@ -493,11 +857,23 @@ export class ChaseScene extends PIXI.Container {
     for (const s of [this.dogRunSprite, this.dogBarkSprite]) {
       s.scale.set(scale)
     }
-    const sprite = showBark ? this.dogBarkSprite : this.dogRunSprite
-    sprite.animationSpeed = this.state.isDanger ? 12 / 60
-      : this.state.dogState === 'returning' ? 14 / 60 : 9 / 60
 
-    const visible = this.dogScreenX > -140
+    // 狗亦隨所在 x 的坡度微傾
+    const dogP = this._progressAtScreenX(this.dogScreenX)
+    const tilt = Math.max(-0.12, Math.min(0.12, -this._getTerrainGrade(dogP) * 0.04))
+    this.dogRunSprite.rotation = tilt
+    this.dogBarkSprite.rotation = tilt
+
+    let animSpeed = 9 / 60
+    if (ds === 'returning') animSpeed = 16 / 60
+    else if (ds === 'retreating') animSpeed = 13 / 60
+    else if (this.state.isDanger) animSpeed = 13 / 60
+    else if (this.state.isNervous) animSpeed = 11 / 60
+
+    const sprite = showBark ? this.dogBarkSprite : this.dogRunSprite
+    sprite.animationSpeed = animSpeed
+
+    const visible = this.dogScreenX > -140 && ds !== 'resting'
     this.dogRunSprite.visible  = visible && !showBark
     this.dogBarkSprite.visible = visible &&  showBark
   }
@@ -525,7 +901,6 @@ export class ChaseScene extends PIXI.Container {
       const bw = W / 7
       const bh = H / 9
       this.dangerOverlay.clear()
-      // 漸層式紅邊
       for (let i = 0; i < 6; i++) {
         const t = i / 6
         const aa = a * (1 - t) * 0.7
@@ -573,8 +948,9 @@ export class ChaseScene extends PIXI.Container {
     sp.width  = sz
     sp.height = sz
     sp.anchor.set(0.5)
+    const gy = this._groundY()
     sp.x = this._riderX() + (Math.random() - 0.7) * 55
-    sp.y = this._groundY() - RIDER_DISPLAY_H * 0.82 + Math.random() * 25
+    sp.y = gy - RIDER_DISPLAY_H * 0.82 + Math.random() * 25
     this.fxLayer.addChild(sp)
     this.sweatParticles.push({
       sprite: sp,

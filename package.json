@@ -1,6 +1,6 @@
 {
   "name": "cycling-chase-game",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "智慧騎行 追逐模式",
   "main": "dist-electron/main/index.js",
   "scripts": {

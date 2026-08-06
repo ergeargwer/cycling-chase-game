@@ -372,10 +372,15 @@ export class GameHud extends PIXI.Container {
     // threat
     this.threatBar.setDistance(s.distance, s.dogState)
 
-    // rest banner
-    this.restBanner.visible = s.dogState === 'resting'
-    if (s.dogState === 'resting') {
+    // rest / status banner
+    const resting = s.dogState === 'resting' || s.dogState === 'retreating'
+    this.restBanner.visible = resting || s.dogState === 'returning'
+    if (resting) {
+      this.restText.text = s.dogState === 'retreating' ? '柴犬喘口氣…' : '柴犬休息中'
       this.restBanner.alpha = 0.75 + 0.25 * Math.sin(this.elapsed * 2.5)
+    } else if (s.dogState === 'returning') {
+      this.restText.text = '柴犬急速追上！'
+      this.restBanner.alpha = 0.85 + 0.15 * Math.sin(this.elapsed * 6)
     }
 
     // dog floating labels
@@ -392,6 +397,9 @@ export class GameHud extends PIXI.Container {
       if (s.dogState === 'returning') {
         this.dogLabel.text = '急速追上!'
         this.dogLabel.style.fill = Theme.accent.orange
+      } else if (s.dogState === 'retreating') {
+        this.dogLabel.text = '喘口氣…'
+        this.dogLabel.style.fill = Theme.text.muted
       } else if (s.isDanger) {
         this.dogLabel.text = '⚠ 危險!'
         this.dogLabel.style.fill = Theme.status.danger

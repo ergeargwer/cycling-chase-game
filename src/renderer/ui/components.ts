@@ -461,9 +461,9 @@ export class ThreatBar extends PIXI.Container {
     const t = Math.max(0, Math.min(1, dist / this.maxDist))
     let color: number = Theme.status.success
     let tag = ''
-    if (dogState === 'resting') {
+    if (dogState === 'resting' || dogState === 'retreating') {
       color = Theme.accent.orange
-      tag = ' 休息中'
+      tag = dogState === 'retreating' ? ' 喘口氣' : ' 休息中'
     } else if (dogState === 'returning') {
       color = Theme.accent.amber
       tag = ' 追上中'
