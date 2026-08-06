@@ -133,7 +133,7 @@ export class MenuScene extends PIXI.Container {
     this.addChild(line)
 
     const desc = new PIXI.Text({
-      text: '保持目標功率 · 甩開柴犬追趕\n真實功率訓練 · 遊戲化體驗',
+      text: '保持目標功率 · 甩開追逐者追趕\n真實功率訓練 · 多主題場景',
       style: textStyle({
         size: 13,
         color: Theme.text.muted,
@@ -172,7 +172,7 @@ export class MenuScene extends PIXI.Container {
 
     // 底部版本
     const ver = new PIXI.Text({
-      text: 'v1.1  ·  智慧騎行 追逐模式',
+      text: 'v1.2  ·  智慧騎行 追逐模式',
       style: textStyle({ size: 11, color: Theme.text.dim, align: 'center' }),
     })
     ver.anchor.set(0.5, 1)

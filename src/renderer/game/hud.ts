@@ -51,6 +51,11 @@ export class GameHud extends PIXI.Container {
   private onQuit?: () => void
   private onRestart?: () => void
 
+  /** 追逐者文案（依主題） */
+  private chaserShortName = '柴犬'
+  private restVerb = '喘口氣'
+  private returnVerb = '急速追上'
+
   private built = false
   private elapsed = 0
 
@@ -63,6 +68,11 @@ export class GameHud extends PIXI.Container {
       onQuit?: () => void
       onRestart?: () => void
     } = {},
+    labels: {
+      chaserShortName?: string
+      restVerb?: string
+      returnVerb?: string
+    } = {},
   ) {
     super()
     this.state = state
@@ -71,6 +81,9 @@ export class GameHud extends PIXI.Container {
     this.onPauseToggle = handlers.onPauseToggle
     this.onQuit = handlers.onQuit
     this.onRestart = handlers.onRestart
+    if (labels.chaserShortName) this.chaserShortName = labels.chaserShortName
+    if (labels.restVerb) this.restVerb = labels.restVerb
+    if (labels.returnVerb) this.returnVerb = labels.returnVerb
   }
 
   build() {
@@ -374,12 +387,15 @@ export class GameHud extends PIXI.Container {
 
     // rest / status banner
     const resting = s.dogState === 'resting' || s.dogState === 'retreating'
+    const who = this.chaserShortName
     this.restBanner.visible = resting || s.dogState === 'returning'
     if (resting) {
-      this.restText.text = s.dogState === 'retreating' ? '柴犬喘口氣…' : '柴犬休息中'
+      this.restText.text = s.dogState === 'retreating'
+        ? `${who}${this.restVerb}…`
+        : `${who}休息中`
       this.restBanner.alpha = 0.75 + 0.25 * Math.sin(this.elapsed * 2.5)
     } else if (s.dogState === 'returning') {
-      this.restText.text = '柴犬急速追上！'
+      this.restText.text = `${who}${this.returnVerb}！`
       this.restBanner.alpha = 0.85 + 0.15 * Math.sin(this.elapsed * 6)
     }
 

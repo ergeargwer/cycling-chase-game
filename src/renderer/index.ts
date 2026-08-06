@@ -1,6 +1,7 @@
 import * as PIXI from 'pixi.js'
 import { GameState, type WorkoutPlan } from './game/game-state'
 import { ChaseScene }  from './game/chase-scene'
+import { resolveThemeId } from './game/themes'
 import { MenuScene }   from './scenes/menu-scene'
 import { PlanScene }   from './scenes/plan-scene'
 import { BleBridge }   from './utils/ble-bridge'
@@ -24,6 +25,10 @@ type Screen = 'menu' | 'plan' | 'chase'
 let screen: Screen = 'menu'
 let bleConnected = false
 let bleName = ''
+
+// URL 或預設主題：?theme=shiba|bear|godzilla|redlady
+const bootParams = new URLSearchParams(location.search)
+let currentThemeId = resolveThemeId(bootParams.get('theme'))
 
 // ── Scenes ───────────────────────────────────────────────
 
@@ -49,9 +54,9 @@ const menuScene = new MenuScene(app, {
 })
 
 const planScene = new PlanScene(app, {
-  onConfirm: (plan) => startChase(plan),
+  onConfirm: (plan, themeId) => startChase(plan, themeId),
   onBack: () => showMenu(),
-})
+}, currentThemeId)
 
 const chaseScene = new ChaseScene(app, state, {
   onQuit: () => {
@@ -61,9 +66,9 @@ const chaseScene = new ChaseScene(app, state, {
     showMenu()
   },
   onRestart: () => {
-    startChase(state.plan)
+    startChase(state.plan, currentThemeId)
   },
-})
+}, currentThemeId)
 
 // ── Screen switching ─────────────────────────────────────
 
@@ -82,14 +87,17 @@ function showMenu() {
 function showPlan() {
   screen = 'plan'
   clearStage()
+  planScene.setThemeId(currentThemeId)
   planScene.build()
   app.stage.addChild(planScene)
 }
 
-async function startChase(plan: WorkoutPlan) {
+async function startChase(plan: WorkoutPlan, themeId?: string) {
+  if (themeId) currentThemeId = resolveThemeId(themeId)
   clearStage()
   state.selectPlan(plan)
   state.start()
+  chaseScene.setTheme(currentThemeId)
   await chaseScene.load()
   if (bleConnected) {
     state.simMode = false
@@ -179,17 +187,22 @@ window.addEventListener('keydown', (e) => {
 
 // ── Boot ─────────────────────────────────────────────────
 
-// 開發除錯：?screen=plan|chase 可直接進入指定畫面
-const bootScreen = new URLSearchParams(location.search).get('screen')
+// 開發除錯：?screen=plan|chase&theme=shiba|bear|godzilla|redlady
+const bootScreen = bootParams.get('screen')
 if (bootScreen === 'plan') {
   showPlan()
 } else if (bootScreen === 'chase') {
-  startChase(state.plan)
+  startChase(state.plan, currentThemeId)
 } else {
   showMenu()
 }
 
 // 供自動化測試 / 除錯
 ;(window as unknown as { __gameNav: unknown }).__gameNav = {
-  showMenu, showPlan, startChase, state,
+  showMenu,
+  showPlan,
+  startChase,
+  state,
+  getThemeId: () => currentThemeId,
+  setThemeId: (id: string) => { currentThemeId = resolveThemeId(id) },
 }

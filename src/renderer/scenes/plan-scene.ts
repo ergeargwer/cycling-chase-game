@@ -1,30 +1,43 @@
-// 訓練計畫選擇場景
+// 訓練計畫選擇場景（含追逐者主題選擇）
 
 import * as PIXI from 'pixi.js'
 import { PLANS, type WorkoutPlan } from '../game/game-state'
+import { THEME_LIST, getTheme, type ChaseTheme } from '../game/themes'
 import { Theme, textStyle } from '../ui/theme'
 import { createButton, createGlassPanel, type UiButton } from '../ui/components'
 
 export class PlanScene extends PIXI.Container {
   private app: PIXI.Application
   private selected: WorkoutPlan = PLANS[0]
+  private selectedThemeId: string = 'shiba'
   private cardBtns: UiButton[] = []
+  private themeBtns: UiButton[] = []
   private detailPanel!: PIXI.Container
   private detailBody!: PIXI.Text
-  private onConfirm: (plan: WorkoutPlan) => void
+  private onConfirm: (plan: WorkoutPlan, themeId: string) => void
   private onBack: () => void
 
   constructor(
     app: PIXI.Application,
     handlers: {
-      onConfirm: (plan: WorkoutPlan) => void
+      onConfirm: (plan: WorkoutPlan, themeId: string) => void
       onBack: () => void
     },
+    initialThemeId: string = 'shiba',
   ) {
     super()
     this.app = app
     this.onConfirm = handlers.onConfirm
     this.onBack = handlers.onBack
+    this.selectedThemeId = getTheme(initialThemeId).id
+  }
+
+  get themeId(): string {
+    return this.selectedThemeId
+  }
+
+  setThemeId(id: string) {
+    this.selectedThemeId = getTheme(id).id
   }
 
   build() {
@@ -57,7 +70,7 @@ export class PlanScene extends PIXI.Container {
     this.addChild(title)
 
     const sub = new PIXI.Text({
-      text: '依目標功率與時長選擇 · 騎行中柴犬會依功率表現追趕',
+      text: '依目標功率與時長選擇 · 騎行中追逐者會依功率表現追趕',
       style: textStyle({ size: 13, color: Theme.text.muted }),
     })
     sub.x = 40
@@ -73,6 +86,32 @@ export class PlanScene extends PIXI.Container {
     backBtn.root.y = 32
     this.addChild(backBtn.root)
 
+    // 追逐者主題列
+    const themeTitle = new PIXI.Text({
+      text: '追逐者主題',
+      style: textStyle({ size: 12, color: Theme.accent.gold, weight: '700', letterSpacing: 1 }),
+    })
+    themeTitle.x = 40
+    themeTitle.y = 96
+    this.addChild(themeTitle)
+
+    this.themeBtns = []
+    const themeY = 118
+    let themeX = 40
+    for (const t of THEME_LIST) {
+      const btn = this._makeThemeChip(t, () => {
+        this.selectedThemeId = t.id
+        this._refreshThemeSelection()
+        this._updateDetail()
+      })
+      btn.root.x = themeX
+      btn.root.y = themeY
+      this.addChild(btn.root)
+      this.themeBtns.push(btn)
+      themeX += 128
+    }
+    this._refreshThemeSelection()
+
     // 計畫卡片網格
     const cols = W > 1100 ? 3 : 2
     const gap = 14
@@ -80,7 +119,7 @@ export class PlanScene extends PIXI.Container {
     const cardW = (listW - gap * (cols - 1)) / cols
     const cardH = 88
     const startX = 40
-    const startY = 110
+    const startY = 168
 
     PLANS.forEach((plan, i) => {
       const col = i % cols
@@ -217,11 +256,59 @@ export class PlanScene extends PIXI.Container {
 
     const goBtn = createButton('開始此計畫 →', Math.min(220, w - 40), 48, {
       variant: 'primary',
-      onClick: () => this.onConfirm(this.selected),
+      onClick: () => this.onConfirm(this.selected, this.selectedThemeId),
     })
     goBtn.root.x = 20
     goBtn.root.y = h - 68
     this.detailPanel.addChild(goBtn.root)
+  }
+
+  private _makeThemeChip(theme: ChaseTheme, onClick: () => void): UiButton {
+    const w = 118
+    const h = 36
+    const root = new PIXI.Container()
+    root.eventMode = 'static'
+    root.cursor = 'pointer'
+
+    const bg = new PIXI.Graphics()
+    root.addChild(bg)
+
+    const label = new PIXI.Text({
+      text: theme.label,
+      style: textStyle({ size: 11, color: Theme.text.primary, weight: '600', align: 'center' }),
+    })
+    label.anchor.set(0.5)
+    label.x = w / 2
+    label.y = h / 2
+    root.addChild(label)
+
+    let selected = false
+    const redraw = (hover: boolean) => {
+      bg.clear()
+      const ba = selected ? 0.65 : hover ? 0.4 : 0.2
+      const bc = selected ? Theme.accent.gold : Theme.accent.cyan
+      bg.roundRect(0, 0, w, h, Theme.radius.pill)
+        .fill({ color: Theme.bg.glass, alpha: selected ? 0.9 : 0.65 })
+        .stroke({ color: bc, alpha: ba, width: selected ? 2 : 1 })
+    }
+    root.on('pointerover', () => redraw(true))
+    root.on('pointerout', () => redraw(false))
+    root.on('pointerup', () => onClick())
+    redraw(false)
+
+    return {
+      root,
+      setLabel: () => {},
+      setEnabled: () => {},
+      setSelected: (on) => { selected = on; redraw(false) },
+      destroy: () => root.destroy({ children: true }),
+    }
+  }
+
+  private _refreshThemeSelection() {
+    THEME_LIST.forEach((t, i) => {
+      this.themeBtns[i]?.setSelected(t.id === this.selectedThemeId)
+    })
   }
 
   private _refreshSelection() {
@@ -232,11 +319,13 @@ export class PlanScene extends PIXI.Container {
 
   private _updateDetail() {
     const plan = this.selected
+    const theme = getTheme(this.selectedThemeId)
     const lines = plan.segments.map((s, i) => {
       const dur = s.durationMin >= 999 ? '∞' : `${s.durationMin}分`
       return `${i + 1}. ${s.name.padEnd(10, '　')}  ${s.watts}W  ·  ${dur}`
     })
-    this.detailBody.text = `${plan.name}\n\n${lines.join('\n')}`
+    this.detailBody.text =
+      `${plan.name}\n主題：${theme.label}（${theme.chaser.shortName}）\n\n${lines.join('\n')}`
   }
 
   update(_dt: number) {}
