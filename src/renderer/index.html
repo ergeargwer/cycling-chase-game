@@ -75,16 +75,30 @@
     </div>
     <script type="module" src="./index.ts"></script>
     <script type="module">
-      // 當 canvas 出現時隱藏 boot
+      // 當 canvas 出現時隱藏 boot；逾時則提示（避免無限轉圈）
       const boot = document.getElementById('boot')
+      const hideBoot = () => {
+        if (!boot || boot.classList.contains('hide')) return
+        boot.classList.add('hide')
+        setTimeout(() => boot.remove(), 450)
+      }
       const obs = new MutationObserver(() => {
         if (document.querySelector('canvas')) {
-          boot?.classList.add('hide')
-          setTimeout(() => boot?.remove(), 450)
+          hideBoot()
           obs.disconnect()
         }
       })
       obs.observe(document.body, { childList: true })
+      setTimeout(() => {
+        if (document.querySelector('canvas')) return
+        if (!boot || !document.body.contains(boot)) return
+        const sub = boot.querySelector('.sub')
+        if (sub) {
+          sub.textContent = '載入逾時，請重新整理'
+          sub.style.letterSpacing = '0.1em'
+          sub.style.color = '#f87171'
+        }
+      }, 15000)
     </script>
   </body>
 </html>
