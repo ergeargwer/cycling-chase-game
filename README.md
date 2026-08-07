@@ -247,6 +247,9 @@ npm run dist:win   # Windows x64
 | 9 | 1.3 | 全 12 主題正式 sheet + 專屬背景；j 殭屍／外星人／砂石車／外送／阿嬤／救護／消防／海邊 |
 | 9.1 | 1.3 | GitHub Pages 上線；修正 entry top-level await 與 Pixi chunk 死鎖（無限載入） |
 | 9.2 | 1.3 | 追逐者透明底、幀座標與比例微調；README 截圖更新 |
+| 9.3 | 1.3 | 現代／復古視覺架構；復古素材規格與占位；追逐者比例；HQ 手繪 sheet + 夜間背景 |
+
+詳細日誌：[`docs/dev-log-2026-08-07.md`](docs/dev-log-2026-08-07.md)
 
 ### 早期原型
 
