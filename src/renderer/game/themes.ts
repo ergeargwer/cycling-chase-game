@@ -33,7 +33,8 @@ export interface ChaserConfig {
   attackFrames: FrameRect[]
   /**
    * 畫面顯示高度（px）。騎士 RIDER_DISPLAY_H = 320。
-   * 人物類建議 280–320；車輛類建議 380–450。
+   * 柴犬等小動物 ~160–180；人物騎乘 ~290–320；
+   * 大型壓迫感角色（熊／哥吉拉）~360–400；重型車輛 ~480–540。
    * chase-scene：scale = (displayHeight / 幀平均高) * scaleMul
    */
   displayHeight: number
@@ -337,7 +338,8 @@ export const THEMES: Record<string, ChaseTheme> = {
       assetAlias: 'chaser-shiba',
       runFrames: DOG_RUN_FRAMES,
       attackFrames: DOG_ATTACK_FRAMES,
-      displayHeight: 300,
+      // 柴犬應明顯小於騎士（320）；過大則比例失衡
+      displayHeight: 170,
       tint: 0xffffff,
       scaleMul: 1,
     },
@@ -396,7 +398,8 @@ export const THEMES: Record<string, ChaseTheme> = {
       assetAlias: 'chaser-bear',
       runFrames: BEAR_RUN_FRAMES,
       attackFrames: BEAR_ATTACK_FRAMES,
-      displayHeight: 310,
+      // 大於騎士，騎單車黑熊的壓迫感
+      displayHeight: 380,
       tint: 0xffffff,
       scaleMul: 1,
     },
@@ -455,7 +458,8 @@ export const THEMES: Record<string, ChaseTheme> = {
       assetAlias: 'chaser-godzilla',
       runFrames: GODZILLA_RUN_FRAMES,
       attackFrames: GODZILLA_ATTACK_FRAMES,
-      displayHeight: 320,
+      // 哥吉拉明顯高於騎士，製造壓迫
+      displayHeight: 400,
       tint: 0xffffff,
       scaleMul: 1,
     },
@@ -699,7 +703,8 @@ export const THEMES: Record<string, ChaseTheme> = {
       assetAlias: 'chaser-dumptruck',
       runFrames: DUMPTRUCK_RUN_FRAMES,
       attackFrames: DUMPTRUCK_ATTACK_FRAMES,
-      displayHeight: 430,
+      // 重型砂石車壓過畫面，壓迫感優先
+      displayHeight: 520,
       tint: 0xffffff,
       scaleMul: 1,
     },
