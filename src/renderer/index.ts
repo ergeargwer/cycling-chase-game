@@ -2,7 +2,12 @@ import * as PIXI from 'pixi.js'
 import { GameState, type WorkoutPlan } from './game/game-state'
 import { ChaseScene }  from './game/chase-scene'
 import { resolveThemeId } from './game/themes'
+import {
+  resolveVisualStyle,
+  type VisualStyle,
+} from './game/visual-style'
 import { MenuScene }   from './scenes/menu-scene'
+import { StyleSelectScene } from './scenes/style-select-scene'
 import { PlanScene }   from './scenes/plan-scene'
 import { BleBridge }   from './utils/ble-bridge'
 
@@ -11,6 +16,9 @@ import { BleBridge }   from './utils/ble-bridge'
  * Vite 會把 Pixi 的 WebGL/WebGPU renderer 拆成獨立 chunk，那些 chunk 會
  * 再 static import 回本 entry。若 entry 有 TLA，模組評估會與動態 import
  * 形成循環依賴死鎖，GitHub Pages / 生產環境會永遠停在載入畫面。
+ *
+ * 畫面流：menu → style → plan → chase
+ * 視覺風格（modern|retro）在 style 選定後寫入 GameState，整場 chase 鎖定。
  */
 async function bootstrap() {
   // ── App bootstrap ────────────────────────────────────────
@@ -28,19 +36,22 @@ async function bootstrap() {
   // ── Shared state ─────────────────────────────────────────
 
   const state = new GameState()
-  type Screen = 'menu' | 'plan' | 'chase'
+  type Screen = 'menu' | 'style' | 'plan' | 'chase'
   let screen: Screen = 'menu'
   let bleConnected = false
   let bleName = ''
 
-  // URL：?theme=<id> 例 ambulance|firetruck|bikini|foodpanda|grandma|…
+  // URL：?theme=<id>&style=modern|retro&screen=plan|style|chase
   const bootParams = new URLSearchParams(location.search)
   let currentThemeId = resolveThemeId(bootParams.get('theme'))
+  if (bootParams.get('style')) {
+    state.setVisualStyle(bootParams.get('style')!)
+  }
 
   // ── Scenes ───────────────────────────────────────────────
 
   const menuScene = new MenuScene(app, {
-    onStart: () => showPlan(),
+    onStart: () => showStyleSelect(),
     onBleScan: async () => {
       try {
         menuScene.setBleStatus(false, '掃描中…')
@@ -60,9 +71,17 @@ async function bootstrap() {
     },
   })
 
+  const styleScene = new StyleSelectScene(app, {
+    onConfirm: (style: VisualStyle) => {
+      state.setVisualStyle(style)
+      showPlan()
+    },
+    onBack: () => showMenu(),
+  })
+
   const planScene = new PlanScene(app, {
     onConfirm: (plan, themeId) => startChase(plan, themeId),
-    onBack: () => showMenu(),
+    onBack: () => showStyleSelect(),
   }, currentThemeId)
 
   const chaseScene = new ChaseScene(app, state, {
@@ -70,9 +89,12 @@ async function bootstrap() {
       state.isRunning = false
       state.isPaused = false
       state.isFinished = false
+      // 回主選單後需重新選風格
+      document.body.removeAttribute('data-visual-style')
       showMenu()
     },
     onRestart: () => {
+      // 重開同一場：沿用已鎖定的 visualStyle
       startChase(state.plan, currentThemeId)
     },
   }, currentThemeId)
@@ -89,6 +111,14 @@ async function bootstrap() {
     menuScene.build()
     if (bleConnected) menuScene.setBleStatus(true, bleName)
     app.stage.addChild(menuScene)
+  }
+
+  function showStyleSelect() {
+    screen = 'style'
+    clearStage()
+    styleScene.setStyle(state.visualStyle)
+    styleScene.build()
+    app.stage.addChild(styleScene)
   }
 
   function showPlan() {
@@ -155,6 +185,7 @@ async function bootstrap() {
   app.ticker.add(ticker => {
     const dt = ticker.deltaMS / 1000
     if (screen === 'menu')  menuScene.update(dt)
+    if (screen === 'style') styleScene.update(dt)
     if (screen === 'plan')  planScene.update(dt)
     if (screen === 'chase') chaseScene.update(dt)
   })
@@ -166,6 +197,7 @@ async function bootstrap() {
     if (resizeTimer) clearTimeout(resizeTimer)
     resizeTimer = setTimeout(() => {
       if (screen === 'menu')  menuScene.resize()
+      if (screen === 'style') styleScene.resize()
       if (screen === 'plan')  planScene.resize()
       if (screen === 'chase') chaseScene.resize()
     }, 150)
@@ -185,6 +217,7 @@ async function bootstrap() {
       if (state.isPaused) {
         state.isRunning = false
         state.isPaused = false
+        document.body.removeAttribute('data-visual-style')
         showMenu()
       } else if (state.isRunning && !state.isFinished) {
         state.isPaused = true
@@ -194,9 +227,11 @@ async function bootstrap() {
 
   // ── Boot ─────────────────────────────────────────────────
 
-  // 開發除錯：?screen=plan|chase&theme=<themeId>
+  // 開發除錯：?screen=plan|style|chase&theme=<id>&style=modern|retro
   const bootScreen = bootParams.get('screen')
-  if (bootScreen === 'plan') {
+  if (bootScreen === 'style') {
+    showStyleSelect()
+  } else if (bootScreen === 'plan') {
     showPlan()
   } else if (bootScreen === 'chase') {
     await startChase(state.plan, currentThemeId)
@@ -207,11 +242,14 @@ async function bootstrap() {
   // 供自動化測試 / 除錯
   ;(window as unknown as { __gameNav: unknown }).__gameNav = {
     showMenu,
+    showStyleSelect,
     showPlan,
     startChase,
     state,
     getThemeId: () => currentThemeId,
     setThemeId: (id: string) => { currentThemeId = resolveThemeId(id) },
+    getVisualStyle: () => state.visualStyle,
+    setVisualStyle: (s: string) => { state.setVisualStyle(resolveVisualStyle(s)) },
   }
 }
 

@@ -14,6 +14,18 @@ import {
   type ChaseTheme,
   type FrameRect,
 } from './themes'
+import {
+  type VisualStyle,
+  riderSpriteSrc,
+  sweatSpriteSrc,
+  styleAssetAlias,
+  textureScaleMode,
+  wantsCrtOverlay,
+  RETRO_RIDER_NORMAL_FRAMES,
+  RETRO_RIDER_NERVOUS_FRAMES,
+  RETRO_DISPLAY,
+  modernPath,
+} from './visual-style'
 
 // ── 地形資料 ─────────────────────────────────────────────
 
@@ -40,7 +52,7 @@ const MINIMAP_W = 200
 const MINIMAP_H = 58
 const MINIMAP_PAD_X = 10
 
-const RIDER_NORMAL_FRAMES: FrameRect[] = [
+const MODERN_RIDER_NORMAL_FRAMES: FrameRect[] = [
   { x: 14,   y: 61,  w: 228, h: 232 },
   { x: 270,  y: 61,  w: 227, h: 232 },
   { x: 526,  y: 61,  w: 228, h: 232 },
@@ -48,7 +60,7 @@ const RIDER_NORMAL_FRAMES: FrameRect[] = [
   { x: 1038, y: 61,  w: 228, h: 232 },
   { x: 1295, y: 61,  w: 227, h: 231 },
 ]
-const RIDER_NERVOUS_FRAMES: FrameRect[] = [
+const MODERN_RIDER_NERVOUS_FRAMES: FrameRect[] = [
   { x: 14,   y: 361, w: 227, h: 232 },
   { x: 270,  y: 361, w: 227, h: 232 },
   { x: 526,  y: 361, w: 228, h: 232 },
@@ -58,7 +70,7 @@ const RIDER_NERVOUS_FRAMES: FrameRect[] = [
 ]
 
 const SWEAT_W = 176, SWEAT_H = 192, SWEAT_COLS = 8
-const RIDER_DISPLAY_H = 320
+const MODERN_RIDER_DISPLAY_H = 320
 const ROAD_TOP_RATIO  = 0.60
 const GROUND_IN_ROAD  = 0.50
 const RIDER_X_RATIO   = 0.78
@@ -137,6 +149,9 @@ export class ChaseScene extends PIXI.Container {
   /** 已載入過的素材 alias，避免重複 load */
   private loadedAliases = new Set<string>()
   private ready = false
+  private crtOverlay: PIXI.Graphics | null = null
+  /** load() 時鎖定的風格（整場 chase 不變） */
+  private sessionStyle: VisualStyle = 'modern'
 
   constructor(
     app: PIXI.Application,
@@ -147,7 +162,8 @@ export class ChaseScene extends PIXI.Container {
     super()
     this.app   = app
     this.state = state
-    this.chaseTheme = getTheme(themeId)
+    this.sessionStyle = state.visualStyle
+    this.chaseTheme = getTheme(themeId, this.sessionStyle)
     this.onQuit = handlers.onQuit
     this.onRestart = handlers.onRestart
     this.addChild(
@@ -158,14 +174,20 @@ export class ChaseScene extends PIXI.Container {
 
   get themeId(): string { return this.chaseTheme.id }
   get theme(): ChaseTheme { return this.chaseTheme }
+  get visualStyle(): VisualStyle { return this.sessionStyle }
 
-  /** 切換主題（需再呼叫 load() 才重建場景） */
+  /** 切換主題（需再呼叫 load() 才重建場景）；風格取自 GameState */
   setTheme(themeId: string) {
-    this.chaseTheme = getTheme(themeId)
+    this.sessionStyle = this.state.visualStyle
+    this.chaseTheme = getTheme(themeId, this.sessionStyle)
   }
 
   async load() {
     this.ready = false
+    // 鎖定本場風格（避免 load 期間 state 被誤改）
+    this.sessionStyle = this.state.visualStyle
+    this.chaseTheme = getTheme(this.chaseTheme.id, this.sessionStyle)
+    this._applyDocumentStyle(this.sessionStyle)
     await this._ensureAssets()
 
     this._clearLayers()
@@ -178,6 +200,7 @@ export class ChaseScene extends PIXI.Container {
     this._buildVignette()
     this._buildHud()
     this._buildTerrainMinimap()
+    this._buildCrtOverlay()
     this._buildDangerOverlay()
 
     const progress = this._getWorkoutProgress()
@@ -188,22 +211,117 @@ export class ChaseScene extends PIXI.Container {
   }
 
   private async _ensureAssets() {
+    const style = this.sessionStyle
     const chaser = this.chaseTheme.chaser
-    const jobs: { alias: string; src: string }[] = []
+    const scaleMode = textureScaleMode(style)
 
-    if (!this.loadedAliases.has('rider')) {
-      jobs.push({ alias: 'rider', src: 'assets/rider.png' })
+    const riderAlias = styleAssetAlias(style, 'rider')
+    const sweatAlias = styleAssetAlias(style, 'sweat')
+    const chaserAlias = chaser.assetAlias // 已含 style: 前綴（retro）或原 modern 別名
+
+    type Job = { alias: string; src: string; fallback?: string }
+    const jobs: Job[] = []
+
+    if (!this.loadedAliases.has(riderAlias)) {
+      jobs.push({
+        alias: riderAlias,
+        src: riderSpriteSrc(style),
+        fallback: modernPath('rider.png'),
+      })
     }
-    if (!this.loadedAliases.has('sweat')) {
-      jobs.push({ alias: 'sweat', src: 'assets/sweat.png' })
+    if (!this.loadedAliases.has(sweatAlias)) {
+      jobs.push({
+        alias: sweatAlias,
+        src: sweatSpriteSrc(style),
+        fallback: modernPath('sweat.png'),
+      })
     }
-    if (!this.loadedAliases.has(chaser.assetAlias)) {
-      jobs.push({ alias: chaser.assetAlias, src: chaser.spriteSrc })
+    if (!this.loadedAliases.has(chaserAlias)) {
+      jobs.push({
+        alias: chaserAlias,
+        src: chaser.spriteSrc,
+        // 復古缺檔時回落 modern 路徑（主題原始 spriteSrc）
+        fallback: style === 'retro'
+          ? (getTheme(this.chaseTheme.id, 'modern').chaser.spriteSrc)
+          : undefined,
+      })
     }
 
-    if (jobs.length > 0) {
-      await PIXI.Assets.load(jobs)
-      for (const j of jobs) this.loadedAliases.add(j.alias)
+    for (const j of jobs) {
+      const ok = await this._loadAssetAlias(j.alias, j.src, j.fallback)
+      if (ok) this.loadedAliases.add(j.alias)
+    }
+
+    // 套用 scaleMode（復古 nearest / 現代 linear）
+    for (const alias of [riderAlias, sweatAlias, chaserAlias]) {
+      const tex = PIXI.Assets.get(alias) as PIXI.Texture | undefined
+      if (tex?.source) {
+        tex.source.scaleMode = scaleMode
+      }
+    }
+  }
+
+  /** 載入素材；primary 失敗時可選 fallback */
+  private async _loadAssetAlias(
+    alias: string,
+    primary: string,
+    fallback?: string,
+  ): Promise<boolean> {
+    const tryLoad = async (src: string) => {
+      await PIXI.Assets.load({ alias, src })
+    }
+    try {
+      await tryLoad(primary)
+      return true
+    } catch (e) {
+      if (!fallback || fallback === primary) {
+        console.warn(`[ChaseScene] asset load failed: ${primary}`, e)
+        return false
+      }
+      try {
+        console.warn(`[ChaseScene] fallback ${primary} → ${fallback}`)
+        await tryLoad(fallback)
+        return true
+      } catch (e2) {
+        console.warn(`[ChaseScene] fallback failed: ${fallback}`, e2)
+        return false
+      }
+    }
+  }
+
+  private _applyDocumentStyle(style: VisualStyle) {
+    document.body.dataset.visualStyle = style
+  }
+
+  private _buildCrtOverlay() {
+    this.crtOverlay = null
+    if (!wantsCrtOverlay(this.sessionStyle)) return
+    const W = this.app.screen.width
+    const H = this.app.screen.height
+    const g = new PIXI.Graphics()
+    // 掃描線
+    for (let y = 0; y < H; y += 3) {
+      g.rect(0, y, W, 1).fill({ color: 0x000000, alpha: 0.12 })
+    }
+    // 輕微暗角
+    g.rect(0, 0, W, H).stroke({ color: 0x000000, alpha: 0.35, width: Math.min(W, H) * 0.04 })
+    g.eventMode = 'none'
+    this.hudLayer.addChild(g)
+    this.crtOverlay = g
+  }
+
+  private _riderFrames(): { normal: FrameRect[]; nervous: FrameRect[]; displayH: number } {
+    if (this.sessionStyle === 'retro') {
+      return {
+        normal: RETRO_RIDER_NORMAL_FRAMES,
+        nervous: RETRO_RIDER_NERVOUS_FRAMES,
+        displayH: RETRO_DISPLAY.rider,
+      }
+    }
+    return {
+      normal: MODERN_RIDER_NORMAL_FRAMES,
+      nervous: MODERN_RIDER_NERVOUS_FRAMES,
+      displayH: MODERN_RIDER_DISPLAY_H,
     }
   }
 
@@ -1158,14 +1276,27 @@ export class ChaseScene extends PIXI.Container {
   }
 
   private _buildRider() {
-    const baseTexture = PIXI.Assets.get('rider') as PIXI.Texture
+    const style = this.sessionStyle
+    const alias = styleAssetAlias(style, 'rider')
+    const baseTexture = PIXI.Assets.get(alias) as PIXI.Texture
+    const frames = this._riderFrames()
+
+    // 復古缺檔回落現代 sheet 時，幀格需改用現代裁切
+    const usingModernSheet = style === 'retro' && this._textureLooksModern(baseTexture)
+    const normalFrames = usingModernSheet ? MODERN_RIDER_NORMAL_FRAMES : frames.normal
+    const nervousFrames = usingModernSheet ? MODERN_RIDER_NERVOUS_FRAMES : frames.nervous
+    const displayH = usingModernSheet ? MODERN_RIDER_DISPLAY_H : frames.displayH
 
     this.riderSprite     = new PIXI.AnimatedSprite(
-      this._makeSheetFrames(baseTexture, RIDER_NORMAL_FRAMES))
+      this._makeSheetFrames(baseTexture, normalFrames))
     this.riderNervSprite = new PIXI.AnimatedSprite(
-      this._makeSheetFrames(baseTexture, RIDER_NERVOUS_FRAMES))
+      this._makeSheetFrames(baseTexture, nervousFrames))
 
-    this.riderBaseScale = RIDER_DISPLAY_H / RIDER_NORMAL_FRAMES[0].h
+    this.riderBaseScale = displayH / normalFrames[0].h
+    // 復古：整數縮放，避免半像素糊邊
+    if (style === 'retro' && !usingModernSheet) {
+      this.riderBaseScale = Math.max(1, Math.round(this.riderBaseScale))
+    }
     const groundY = this._groundY()
     const riderX  = this._riderX()
 
@@ -1176,6 +1307,7 @@ export class ChaseScene extends PIXI.Container {
       s.scale.set(this.riderBaseScale)
       s.x = riderX
       s.y = groundY
+      s.roundPixels = style === 'retro'
     }
 
     this.riderSprite.play()
@@ -1184,19 +1316,39 @@ export class ChaseScene extends PIXI.Container {
     this.gameLayer.addChild(this.riderSprite, this.riderNervSprite)
   }
 
+  /** 啟發式：復古 48 格 sheet 通常很窄；現代 rider sheet 很寬 */
+  private _textureLooksModern(tex: PIXI.Texture): boolean {
+    return (tex.width ?? 0) > 400
+  }
+
   /** 追逐者（柴犬／黑熊／哥吉拉…） */
   private _buildChaser() {
     const cfg = this.chaseTheme.chaser
+    const style = this.sessionStyle
     const baseTexture = PIXI.Assets.get(cfg.assetAlias) as PIXI.Texture
 
-    this.chaserRunSprite = new PIXI.AnimatedSprite(
-      this._makeSheetFrames(baseTexture, cfg.runFrames))
-    this.chaserAtkSprite = new PIXI.AnimatedSprite(
-      this._makeSheetFrames(baseTexture, cfg.attackFrames))
+    // 復古路徑缺檔回落現代 sheet 時改用 modern 幀
+    let runFrames = cfg.runFrames
+    let atkFrames = cfg.attackFrames
+    let displayH = cfg.displayHeight
+    if (style === 'retro' && this._textureLooksModern(baseTexture)) {
+      const modern = getTheme(this.chaseTheme.id, 'modern').chaser
+      runFrames = modern.runFrames
+      atkFrames = modern.attackFrames
+      displayH = modern.displayHeight
+    }
 
-    // 以幀平均像素高對齊 displayHeight（騎士 320；柴犬~170；大型角色~380–400；重車~520）
-    const avgH = cfg.runFrames.reduce((a, f) => a + f.h, 0) / Math.max(1, cfg.runFrames.length)
-    this.chaserBaseScale = (cfg.displayHeight / avgH) * cfg.scaleMul
+    this.chaserRunSprite = new PIXI.AnimatedSprite(
+      this._makeSheetFrames(baseTexture, runFrames))
+    this.chaserAtkSprite = new PIXI.AnimatedSprite(
+      this._makeSheetFrames(baseTexture, atkFrames))
+
+    // 以幀平均像素高對齊 displayHeight
+    const avgH = runFrames.reduce((a, f) => a + f.h, 0) / Math.max(1, runFrames.length)
+    this.chaserBaseScale = (displayH / avgH) * cfg.scaleMul
+    if (style === 'retro' && avgH <= 64) {
+      this.chaserBaseScale = Math.max(1, Math.round(this.chaserBaseScale))
+    }
 
     const groundY = this._groundY()
     const animMul = this.chaseTheme.behavior.animSpeedMul
@@ -1208,6 +1360,7 @@ export class ChaseScene extends PIXI.Container {
       s.scale.set(this.chaserBaseScale)
       s.tint = cfg.tint
       s.y = groundY
+      s.roundPixels = style === 'retro'
       s.play()
     }
 
@@ -1216,7 +1369,17 @@ export class ChaseScene extends PIXI.Container {
   }
 
   private _buildSweat() {
-    const baseTexture = PIXI.Assets.get('sweat') as PIXI.Texture
+    const alias = styleAssetAlias(this.sessionStyle, 'sweat')
+    const baseTexture = PIXI.Assets.get(alias) as PIXI.Texture | undefined
+    if (!baseTexture) {
+      this.sweatTextures = []
+      return
+    }
+    // 復古小圖：若寬度不足以切 modern 格，則整張當單幀
+    if (baseTexture.width < SWEAT_W * 2) {
+      this.sweatTextures = [baseTexture]
+      return
+    }
     const row = 2
     this.sweatTextures = Array.from({ length: SWEAT_COLS }, (_, col) =>
       new PIXI.Texture({
@@ -1257,6 +1420,7 @@ export class ChaseScene extends PIXI.Container {
         restVerb: this.chaseTheme.behavior.restVerb,
         returnVerb: this.chaseTheme.behavior.returnVerb,
       },
+      this.sessionStyle,
     )
     this.hud.build()
     this.hudLayer.addChild(this.hud)
@@ -1637,7 +1801,8 @@ export class ChaseScene extends PIXI.Container {
     sp.anchor.set(0.5)
     const gy = this._groundY()
     sp.x = this._riderX() + (Math.random() - 0.7) * 55
-    sp.y = gy - RIDER_DISPLAY_H * 0.82 + Math.random() * 25
+    const riderH = this.sessionStyle === 'retro' ? RETRO_DISPLAY.rider : MODERN_RIDER_DISPLAY_H
+    sp.y = gy - riderH * 0.82 + Math.random() * 25
     this.fxLayer.addChild(sp)
     this.sweatParticles.push({
       sprite: sp,

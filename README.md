@@ -14,10 +14,12 @@
 > **https://ergeargwer.github.io/cycling-chase-game/**
 
 - 線上為**模擬功率模式**（不需騎行台；瀏覽器無法使用 Electron BLE）
+- **流程：** 主選單 → **視覺風格（現代／復古）** → 訓練計畫／主題 → 追逐
 - 主題切換範例：  
   [`?theme=bear`](https://ergeargwer.github.io/cycling-chase-game/?theme=bear) ·  
-  [`?screen=chase&theme=firetruck`](https://ergeargwer.github.io/cycling-chase-game/?screen=chase&theme=firetruck) ·  
+  [`?style=retro&screen=chase&theme=shiba`](https://ergeargwer.github.io/cycling-chase-game/?style=retro&screen=chase&theme=shiba) ·  
   [`?screen=chase&theme=bikini`](https://ergeargwer.github.io/cycling-chase-game/?screen=chase&theme=bikini)
+- 復古像素素材規格：[`docs/retro-asset-spec.md`](docs/retro-asset-spec.md)
 - 部署：push 到 `main` 會觸發 [Deploy GitHub Pages](.github/workflows/deploy-pages.yml)
 
 本機僅開網頁版：
@@ -137,6 +139,7 @@ npm run dev:web
 
 - **功率驅動追逐** — 距離向功率平衡點平滑收斂（0–80 m）
 - **12 種資料驅動主題** — 角色 sheet + 場景旗標 + 行為微調
+- **現代／復古視覺** — 進遊戲前選擇；整場鎖定、不熱切換（`modern` | `retro`）
 - **可變坡度 + 路線剖面** — 紅點即時進度
 - **6 套訓練計畫** — 含自由騎乘
 - **BLE FTMS** — 功率／踏頻；未連線模擬模式
@@ -159,18 +162,22 @@ npm run dev:web
 
 ```
 cycling-chase-game/
-├── assets/                 # 騎士／追逐者 sheet、汗珠
-├── docs/screenshots/       # README 截圖
+├── assets/                 # 現代 sheet（根目錄）
+│   └── retro/              # 復古像素素材（見 docs/retro-asset-spec.md）
+├── docs/
+│   ├── screenshots/
+│   └── retro-asset-spec.md # 復古素材完整規格
 ├── .github/workflows/      # Pages 自動部署
 ├── src/
 │   ├── main/               # Electron + BLE
 │   └── renderer/
 │       ├── game/
-│       │   ├── themes.ts        # 主題定義與幀座標
+│       │   ├── visual-style.ts  # modern|retro 路徑／幀／CRT
+│       │   ├── themes.ts        # 主題定義（依 style 解析素材）
 │       │   ├── chase-scene.ts   # 場景、地形、主題背景
-│       │   ├── game-state.ts
+│       │   ├── game-state.ts    # 含 visualStyle
 │       │   └── hud.ts
-│       └── scenes/         # 主選單、計畫＋主題
+│       └── scenes/         # 主選單、風格選擇、計畫＋主題
 └── package.json
 ```
 

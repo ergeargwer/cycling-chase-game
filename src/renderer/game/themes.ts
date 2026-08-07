@@ -6,6 +6,17 @@
 // 3. 在 THEMES 新增一筆 ChaseTheme，填 id / 素材 / 背景開關 / 路面色
 // 4. 若需專屬背景繪製，在 chase-scene._buildBackground 的 switch 加 case
 // 5. 選單或 URL ?theme=<id> 即可選用（見 getTheme / resolveThemeId）
+// 6. 復古素材：assets/retro/chasers/<id>.png（見 docs/retro-asset-spec.md）
+
+import {
+  type VisualStyle,
+  DEFAULT_VISUAL_STYLE,
+  chaserSpriteSrc,
+  styleAssetAlias,
+  RETRO_RUN_FRAMES,
+  RETRO_ATTACK_FRAMES,
+  retroChaserDisplayHeight,
+} from './visual-style'
 
 /** Sprite sheet 單一幀裁切 */
 export interface FrameRect {
@@ -1051,13 +1062,35 @@ export const THEMES: Record<string, ChaseTheme> = {
 
 export const THEME_LIST: ChaseTheme[] = Object.values(THEMES)
 
-export function getTheme(id: string | null | undefined): ChaseTheme {
-  if (id && THEMES[id]) return THEMES[id]
-  return THEMES[DEFAULT_THEME_ID]
+/**
+ * 取得主題定義。
+ * @param style 視覺風格；retro 時改寫 sprite 路徑、幀格與 displayHeight。
+ *              玩法／背景旗標／行為倍率不變。
+ */
+export function getTheme(
+  id: string | null | undefined,
+  style: VisualStyle = DEFAULT_VISUAL_STYLE,
+): ChaseTheme {
+  const base = (id && THEMES[id]) ? THEMES[id] : THEMES[DEFAULT_THEME_ID]
+  if (style === 'modern') return base
+
+  // 復古：路徑 + 像素幀 + 整數倍顯示高；背景／行為沿用
+  return {
+    ...base,
+    chaser: {
+      ...base.chaser,
+      spriteSrc: chaserSpriteSrc('retro', base.id, base.chaser.spriteSrc),
+      assetAlias: styleAssetAlias('retro', base.chaser.assetAlias),
+      runFrames: RETRO_RUN_FRAMES,
+      attackFrames: RETRO_ATTACK_FRAMES,
+      displayHeight: retroChaserDisplayHeight(base.id),
+      scaleMul: 1,
+    },
+  }
 }
 
 export function resolveThemeId(raw: string | null | undefined): string {
-  return getTheme(raw).id
+  return getTheme(raw, 'modern').id
 }
 
 export function isThemeId(id: string): boolean {

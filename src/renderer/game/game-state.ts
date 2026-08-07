@@ -1,5 +1,13 @@
 // 訓練計畫定義、距離計算、小狗狀態機
 
+import {
+  DEFAULT_VISUAL_STYLE,
+  resolveVisualStyle,
+  type VisualStyle,
+} from './visual-style'
+
+export type { VisualStyle } from './visual-style'
+
 export interface Segment {
   name:        string
   watts:       number
@@ -123,6 +131,12 @@ export class GameState {
   isPaused:         boolean     = false
   isFinished:       boolean     = false
   simMode:          boolean     = true
+  /**
+   * 視覺風格（modern | retro）。
+   * 僅在進入訓練前由 StyleSelectScene 寫入；Chase 過程不熱切換。
+   * 回主選單後再次開始會重新選擇。
+   */
+  visualStyle:      VisualStyle = DEFAULT_VISUAL_STYLE
   dogState:         DogState    = 'chasing'
   /** 休息剩餘秒數 */
   restCountdown:    number      = 0
@@ -136,6 +150,10 @@ export class GameState {
   constructor() { this.scheduleRest() }
 
   selectPlan(plan: WorkoutPlan) { this.plan = plan }
+
+  setVisualStyle(style: VisualStyle | string) {
+    this.visualStyle = resolveVisualStyle(style)
+  }
 
   start() {
     this.segIdx            = 0

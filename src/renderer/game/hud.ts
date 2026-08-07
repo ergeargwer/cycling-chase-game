@@ -13,11 +13,13 @@ import {
   createButton,
   type UiButton,
 } from '../ui/components'
+import type { VisualStyle } from './visual-style'
 
 export class GameHud extends PIXI.Container {
   private state: GameState
   private getW: () => number
   private getH: () => number
+  private visualStyle: VisualStyle
 
   // 頂部
   private topPanel!: PIXI.Graphics
@@ -73,11 +75,13 @@ export class GameHud extends PIXI.Container {
       restVerb?: string
       returnVerb?: string
     } = {},
+    visualStyle: VisualStyle = 'modern',
   ) {
     super()
     this.state = state
     this.getW = getW
     this.getH = getH
+    this.visualStyle = visualStyle
     this.onPauseToggle = handlers.onPauseToggle
     this.onQuit = handlers.onQuit
     this.onRestart = handlers.onRestart
@@ -93,16 +97,34 @@ export class GameHud extends PIXI.Container {
     this.built = true
     const W = this.getW()
     const H = this.getH()
+    const retro = this.visualStyle === 'retro'
+    // 復古：硬邊、高對比、較不透明；現代維持玻璃面板
+    const panelRadius = retro ? 2 : Theme.radius.lg
+    const panelAlpha = retro ? 0.92 : 0.55
+    const borderAlpha = retro ? 0.55 : 0.12
+    const borderColor = retro ? 0xfcfcfc : undefined
 
     // ── 頂部玻璃條 ──
     this.topPanel = createGlassPanel(W - 24, 96, {
-      radius: Theme.radius.lg,
-      fillAlpha: 0.55,
-      borderAlpha: 0.12,
+      radius: panelRadius,
+      fillAlpha: panelAlpha,
+      borderAlpha,
+      border: borderColor,
+      fill: retro ? 0x0a0a12 : undefined,
     })
     this.topPanel.x = 12
     this.topPanel.y = 10
     this.addChild(this.topPanel)
+
+    if (retro) {
+      const styleTag = new PIXI.Text({
+        text: '8-BIT',
+        style: textStyle({ size: 10, color: 0xfbbf24, weight: '700', mono: true }),
+      })
+      styleTag.x = W - 72
+      styleTag.y = 14
+      this.addChild(styleTag)
+    }
 
     // 功率環
     this.ratioGauge = new CircularGauge({

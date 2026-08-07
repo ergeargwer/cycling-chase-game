@@ -22,6 +22,11 @@
         width: 100%;
         height: 100%;
       }
+      /* 復古：CSS 層最近鄰，避免瀏覽器平滑縮放 */
+      body[data-visual-style="retro"] canvas {
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+      }
       /* 載入遮罩（Pixi 初始化前） */
       #boot {
         position: fixed;
