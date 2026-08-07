@@ -8,3 +8,6 @@ assets/_sprite-preview/
 # local opaque backups from bg keying
 assets/*.opaque.png
 assets/*.bak
+
+# intermediate remove-bg outputs
+assets/*.pre_withoutbg.png

@@ -308,19 +308,19 @@ export const FIRETRUCK_ATTACK_FRAMES: FrameRect[] = [
 
 /** 比基尼騎手 bikini.png — 騎行 6 幀 */
 export const BIKINI_RUN_FRAMES: FrameRect[] = [
-  { x: 11,   y: 6, w: 203, h: 189 },
-  { x: 231,  y: 6, w: 203, h: 189 },
-  { x: 451,  y: 6, w: 204, h: 189 },
-  { x: 671,  y: 6, w: 204, h: 189 },
-  { x: 891,  y: 6, w: 203, h: 189 },
-  { x: 1110, y: 6, w: 204, h: 189 },
+  { x:   12, y:   0, w: 207, h: 199 },
+  { x:  231, y:   0, w: 207, h: 194 },
+  { x:  451, y:   0, w: 206, h: 199 },
+  { x:  670, y:   0, w: 207, h: 194 },
+  { x:  889, y:   0, w: 207, h: 194 },
+  { x: 1109, y:   0, w: 206, h: 194 },
 ]
 
 /** 比基尼 — 回頭／加速／揮手 3 幀 */
 export const BIKINI_ATTACK_FRAMES: FrameRect[] = [
-  { x: 11,  y: 207, w: 203, h: 187 },
-  { x: 231, y: 232, w: 204, h: 162 },
-  { x: 451, y: 206, w: 204, h: 188 },
+  { x:   12, y: 199, w: 207, h: 195 },
+  { x:  231, y: 211, w: 207, h: 183 },
+  { x:  450, y: 199, w: 207, h: 195 },
 ]
 
 export const DEFAULT_THEME_ID = 'shiba'
