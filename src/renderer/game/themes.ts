@@ -129,9 +129,26 @@ export interface ChaseTheme {
   behavior: ThemeBehavior
 }
 
-// ── Sprite 幀裁切（sheet 約 1320×400，上 6 騎行 / 下 3 威脅）────
+// ── Sprite 幀裁切 ────────────────────────────────────────
+// HQ 追逐者 sheet：1920×640，6 欄×2 列，每格 320×320
+// 上列騎行 6 幀、下列威脅 3 幀（左三格）
 
-/** 柴犬 dog.png / shiba.png — 奔跑 6 幀 */
+const HQ_CELL = 320
+
+/** 均勻格狀幀（HQ sheet 1920×640） */
+function hqGridFrames(count: number, row: number): FrameRect[] {
+  return Array.from({ length: count }, (_, i) => ({
+    x: i * HQ_CELL,
+    y: row * HQ_CELL,
+    w: HQ_CELL,
+    h: HQ_CELL,
+  }))
+}
+
+export const HQ_RUN_FRAMES: FrameRect[] = hqGridFrames(6, 0)
+export const HQ_ATTACK_FRAMES: FrameRect[] = hqGridFrames(3, 1)
+
+/** 柴犬 dog.png — 舊裁切（未重產 HQ sheet 時沿用） */
 export const DOG_RUN_FRAMES: FrameRect[] = [
   { x: 12,   y: 51,  w: 196, h: 142 },
   { x: 233,  y: 35,  w: 194, h: 157 },
@@ -141,199 +158,35 @@ export const DOG_RUN_FRAMES: FrameRect[] = [
   { x: 1112, y: 38,  w: 196, h: 155 },
 ]
 
-/** 柴犬 — 吠叫 3 幀 */
 export const DOG_ATTACK_FRAMES: FrameRect[] = [
   { x: 12,  y: 263, w: 196, h: 130 },
   { x: 232, y: 263, w: 196, h: 130 },
   { x: 452, y: 217, w: 196, h: 176 },
 ]
 
-/** 黑熊 bear.png — 騎行 6 幀 */
-export const BEAR_RUN_FRAMES: FrameRect[] = [
-  { x: 35,   y: 5,  w: 161, h: 188 },
-  { x: 257,  y: 6,  w: 160, h: 187 },
-  { x: 478,  y: 0,  w: 161, h: 193 },
-  { x: 697,  y: 6,  w: 162, h: 187 },
-  { x: 917,  y: 6,  w: 160, h: 187 },
-  { x: 1137, y: 6,  w: 161, h: 187 },
-]
-
-/** 黑熊 — 咆哮揮爪 3 幀 */
-export const BEAR_ATTACK_FRAMES: FrameRect[] = [
-  { x: 35,  y: 202, w: 183, h: 196 },
-  { x: 257, y: 201, w: 183, h: 197 },
-  { x: 478, y: 202, w: 161, h: 196 },
-]
-
-/** 哥吉拉 godzilla.png — 騎行 6 幀 */
-export const GODZILLA_RUN_FRAMES: FrameRect[] = [
-  { x: 7,    y: 7, w: 202, h: 187 },
-  { x: 227,  y: 7, w: 202, h: 186 },
-  { x: 447,  y: 7, w: 203, h: 187 },
-  { x: 669,  y: 7, w: 202, h: 187 },
-  { x: 889,  y: 7, w: 201, h: 187 },
-  { x: 1108, y: 7, w: 202, h: 186 },
-]
-
-/** 哥吉拉 — 咆哮／噴火 3 幀 */
-export const GODZILLA_ATTACK_FRAMES: FrameRect[] = [
-  { x: 7,   y: 207, w: 213, h: 186 },
-  { x: 220, y: 207, w: 220, h: 186 },
-  { x: 440, y: 207, w: 220, h: 184 },
-]
-
-/** 紅衣小姐 redlady.png — 騎行 6 幀 */
-export const REDLADY_RUN_FRAMES: FrameRect[] = [
-  { x: 19,   y: 8, w: 190, h: 187 },
-  { x: 239,  y: 8, w: 189, h: 187 },
-  { x: 458,  y: 8, w: 189, h: 187 },
-  { x: 677,  y: 8, w: 189, h: 187 },
-  { x: 897,  y: 8, w: 189, h: 187 },
-  { x: 1116, y: 8, w: 189, h: 187 },
-]
-
-/** 紅衣小姐 — 威脅／回頭／伸手 3 幀 */
-export const REDLADY_ATTACK_FRAMES: FrameRect[] = [
-  { x: 17,  y: 204, w: 191, h: 189 },
-  { x: 237, y: 205, w: 190, h: 188 },
-  { x: 458, y: 206, w: 189, h: 187 },
-]
-
-/** 跳殭屍 jiangshi.png — 僵硬騎行 6 幀 */
-export const JIANGSHI_RUN_FRAMES: FrameRect[] = [
-  { x: 23,   y: 7, w: 186, h: 187 },
-  { x: 243,  y: 7, w: 186, h: 187 },
-  { x: 463,  y: 7, w: 186, h: 187 },
-  { x: 683,  y: 7, w: 185, h: 187 },
-  { x: 902,  y: 7, w: 186, h: 187 },
-  { x: 1123, y: 7, w: 186, h: 187 },
-]
-
-/** 跳殭屍 — 張嘴／前傾／符紙 3 幀 */
-export const JIANGSHI_ATTACK_FRAMES: FrameRect[] = [
-  { x: 23,  y: 208, w: 192, h: 185 },
-  { x: 244, y: 207, w: 191, h: 186 },
-  { x: 463, y: 205, w: 193, h: 188 },
-]
-
-/** 外星人 alien.png — 騎行 6 幀 */
-export const ALIEN_RUN_FRAMES: FrameRect[] = [
-  { x: 10,   y: 5, w: 198, h: 190 },
-  { x: 241,  y: 5, w: 188, h: 191 },
-  { x: 461,  y: 5, w: 187, h: 190 },
-  { x: 681,  y: 5, w: 187, h: 191 },
-  { x: 894,  y: 5, w: 195, h: 190 },
-  { x: 1115, y: 5, w: 197, h: 190 },
-]
-
-/** 外星人 — 發光眼／伸手 3 幀 */
-export const ALIEN_ATTACK_FRAMES: FrameRect[] = [
-  { x: 14,  y: 210, w: 203, h: 184 },
-  { x: 233, y: 210, w: 206, h: 184 },
-  { x: 453, y: 210, w: 207, h: 184 },
-]
-
-/** 砂石車 dumptruck.png — 行駛 6 幀 */
-export const DUMPTRUCK_RUN_FRAMES: FrameRect[] = [
-  { x: 9,    y: 9, w: 210, h: 182 },
-  { x: 229,  y: 10, w: 210, h: 180 },
-  { x: 448,  y: 9, w: 210, h: 181 },
-  { x: 668,  y: 9, w: 209, h: 182 },
-  { x: 887,  y: 9, w: 209, h: 181 },
-  { x: 1105, y: 9, w: 209, h: 182 },
-]
-
-/** 砂石車 — 閃燈／加速 3 幀 */
-export const DUMPTRUCK_ATTACK_FRAMES: FrameRect[] = [
-  { x: 7,   y: 205, w: 213, h: 186 },
-  { x: 228, y: 203, w: 212, h: 188 },
-  { x: 447, y: 200, w: 213, h: 191 },
-]
-
-/** Foodpanda 外送員 foodpanda.png — 騎行 6 幀 */
-export const FOODPANDA_RUN_FRAMES: FrameRect[] = [
-  { x: 17,   y: 7, w: 200, h: 188 },
-  { x: 237,  y: 7, w: 200, h: 188 },
-  { x: 457,  y: 7, w: 199, h: 188 },
-  { x: 677,  y: 7, w: 200, h: 188 },
-  { x: 897,  y: 7, w: 199, h: 188 },
-  { x: 1116, y: 7, w: 200, h: 188 },
-]
-
-/** Foodpanda — 回頭／揮手／加速 3 幀 */
-export const FOODPANDA_ATTACK_FRAMES: FrameRect[] = [
-  { x: 17,  y: 204, w: 199, h: 189 },
-  { x: 238, y: 204, w: 199, h: 189 },
-  { x: 457, y: 221, w: 200, h: 172 },
-]
-
-/** 老太太三輪車 grandma.png — 騎行 6 幀 */
-export const GRANDMA_RUN_FRAMES: FrameRect[] = [
-  { x: 6,    y: 5, w: 204, h: 190 },
-  { x: 227,  y: 5, w: 204, h: 190 },
-  { x: 447,  y: 5, w: 205, h: 190 },
-  { x: 667,  y: 5, w: 204, h: 190 },
-  { x: 888,  y: 5, w: 204, h: 190 },
-  { x: 1108, y: 5, w: 205, h: 190 },
-]
-
-/** 老太太 — 揮手／猛踩／怒視 3 幀 */
-export const GRANDMA_ATTACK_FRAMES: FrameRect[] = [
-  { x: 6,   y: 203, w: 204, h: 191 },
-  { x: 227, y: 203, w: 204, h: 191 },
-  { x: 447, y: 204, w: 205, h: 190 },
-]
-
-/** 救護車 ambulance.png — 行駛 6 幀 */
-export const AMBULANCE_RUN_FRAMES: FrameRect[] = [
-  { x: 14,   y: 33, w: 198, h: 137 },
-  { x: 234,  y: 33, w: 200, h: 137 },
-  { x: 453,  y: 33, w: 201, h: 137 },
-  { x: 675,  y: 32, w: 199, h: 138 },
-  { x: 893,  y: 32, w: 201, h: 138 },
-  { x: 1115, y: 33, w: 198, h: 136 },
-]
-
-/** 救護車 — 喇叭／加速／閃燈 3 幀 */
-export const AMBULANCE_ATTACK_FRAMES: FrameRect[] = [
-  { x: 11,  y: 213, w: 209, h: 161 },
-  { x: 221, y: 238, w: 216, h: 138 },
-  { x: 445, y: 199, w: 215, h: 176 },
-]
-
-/** 消防車 firetruck.png — 行駛 6 幀 */
-export const FIRETRUCK_RUN_FRAMES: FrameRect[] = [
-  { x: 15,   y: 41, w: 203, h: 152 },
-  { x: 236,  y: 41, w: 203, h: 152 },
-  { x: 449,  y: 41, w: 211, h: 152 },
-  { x: 677,  y: 41, w: 203, h: 153 },
-  { x: 896,  y: 41, w: 202, h: 152 },
-  { x: 1115, y: 41, w: 203, h: 152 },
-]
-
-/** 消防車 — 噴水／閃燈／衝刺 3 幀 */
-export const FIRETRUCK_ATTACK_FRAMES: FrameRect[] = [
-  { x: 0,   y: 225, w: 220, h: 167 },
-  { x: 220, y: 199, w: 220, h: 193 },
-  { x: 440, y: 209, w: 220, h: 183 },
-]
-
-/** 比基尼騎手 bikini.png — 騎行 6 幀 */
-export const BIKINI_RUN_FRAMES: FrameRect[] = [
-  { x:   12, y:   0, w: 207, h: 199 },
-  { x:  231, y:   0, w: 207, h: 194 },
-  { x:  451, y:   0, w: 206, h: 199 },
-  { x:  670, y:   0, w: 207, h: 194 },
-  { x:  889, y:   0, w: 207, h: 194 },
-  { x: 1109, y:   0, w: 206, h: 194 },
-]
-
-/** 比基尼 — 回頭／加速／揮手 3 幀 */
-export const BIKINI_ATTACK_FRAMES: FrameRect[] = [
-  { x:   12, y: 199, w: 207, h: 195 },
-  { x:  231, y: 211, w: 207, h: 183 },
-  { x:  450, y: 199, w: 207, h: 195 },
-]
+/** 以下 11 主題使用 HQ 均勻格（assets/<id>.png 1920×640） */
+export const BEAR_RUN_FRAMES = HQ_RUN_FRAMES
+export const BEAR_ATTACK_FRAMES = HQ_ATTACK_FRAMES
+export const GODZILLA_RUN_FRAMES = HQ_RUN_FRAMES
+export const GODZILLA_ATTACK_FRAMES = HQ_ATTACK_FRAMES
+export const REDLADY_RUN_FRAMES = HQ_RUN_FRAMES
+export const REDLADY_ATTACK_FRAMES = HQ_ATTACK_FRAMES
+export const JIANGSHI_RUN_FRAMES = HQ_RUN_FRAMES
+export const JIANGSHI_ATTACK_FRAMES = HQ_ATTACK_FRAMES
+export const ALIEN_RUN_FRAMES = HQ_RUN_FRAMES
+export const ALIEN_ATTACK_FRAMES = HQ_ATTACK_FRAMES
+export const DUMPTRUCK_RUN_FRAMES = HQ_RUN_FRAMES
+export const DUMPTRUCK_ATTACK_FRAMES = HQ_ATTACK_FRAMES
+export const FOODPANDA_RUN_FRAMES = HQ_RUN_FRAMES
+export const FOODPANDA_ATTACK_FRAMES = HQ_ATTACK_FRAMES
+export const GRANDMA_RUN_FRAMES = HQ_RUN_FRAMES
+export const GRANDMA_ATTACK_FRAMES = HQ_ATTACK_FRAMES
+export const AMBULANCE_RUN_FRAMES = HQ_RUN_FRAMES
+export const AMBULANCE_ATTACK_FRAMES = HQ_ATTACK_FRAMES
+export const FIRETRUCK_RUN_FRAMES = HQ_RUN_FRAMES
+export const FIRETRUCK_ATTACK_FRAMES = HQ_ATTACK_FRAMES
+export const BIKINI_RUN_FRAMES = HQ_RUN_FRAMES
+export const BIKINI_ATTACK_FRAMES = HQ_ATTACK_FRAMES
 
 export const DEFAULT_THEME_ID = 'shiba'
 
