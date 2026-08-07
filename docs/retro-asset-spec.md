@@ -3,7 +3,8 @@
 **專案：** 智慧騎行 · 追逐模式（cycling-chase-game）  
 **風格定位：** 側視像素 · 參考 FC《坦克大戰》（Battle City）硬邊／有限色盤／tile 感  
 **用途：** 繪師或 AI 圖像工具產出 `assets/retro/` 下全部素材  
-**程式對應：** `src/renderer/game/visual-style.ts`、`getTheme(id, 'retro')`
+**程式對應：** `src/renderer/game/visual-style.ts`、`getTheme(id, 'retro')`  
+**場景／背景／多層視差詳規：** 見 [retro-scene-props-spec.md](./retro-scene-props-spec.md)（墓碑、靈骨塔、騎樓等可辨識物件）
 
 > 本文**不**描述程式實作，只定義檔名、尺寸、幀配置、色盤與交件標準。
 
