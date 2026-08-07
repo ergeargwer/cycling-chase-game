@@ -26,6 +26,8 @@ import {
   RETRO_DISPLAY,
   modernPath,
 } from './visual-style'
+import { loadTextureWithFallback } from './asset-loader'
+import { RetroParallaxWorld } from './retro-parallax'
 
 // ── 地形資料 ─────────────────────────────────────────────
 
@@ -152,6 +154,9 @@ export class ChaseScene extends PIXI.Container {
   private crtOverlay: PIXI.Graphics | null = null
   /** load() 時鎖定的風格（整場 chase 不變） */
   private sessionStyle: VisualStyle = 'modern'
+  /** 復古多層視差（規格 L0–L4）；缺檔時為 null，回落 Graphics 背景 */
+  private retroWorld: RetroParallaxWorld | null = null
+  private useRetroWorld = false
 
   constructor(
     app: PIXI.Application,
@@ -191,9 +196,38 @@ export class ChaseScene extends PIXI.Container {
     await this._ensureAssets()
 
     this._clearLayers()
-    this._buildBackground()
-    this._buildRoad()
-    this._buildLamps()
+    this.useRetroWorld = false
+    this.retroWorld?.destroy()
+    this.retroWorld = null
+
+    if (this.sessionStyle === 'retro') {
+      // 復古：優先規格路徑的 tile / mid / props 視差層
+      const world = new RetroParallaxWorld()
+      const gY = this.app.screen.height * ROAD_TOP_RATIO
+      const ok = await world.build(
+        this.chaseTheme.id,
+        this.app.screen.width,
+        this.app.screen.height,
+        gY,
+      )
+      if (ok) {
+        this.retroWorld = world
+        this.useRetroWorld = true
+        this.bgLayer.addChild(world.root)
+        // 坡度仍用 Graphics 路面形狀；路肩 props 由 RetroParallax 負責
+        this._buildRoad()
+      } else {
+        // 缺場景素材：Graphics 背景 + nearest 角色 + CRT
+        this._buildBackground()
+        this._buildRoad()
+        this._buildLamps()
+      }
+    } else {
+      this._buildBackground()
+      this._buildRoad()
+      this._buildLamps()
+    }
+
     this._buildRider()
     this._buildChaser()
     this._buildSweat()
@@ -261,32 +295,13 @@ export class ChaseScene extends PIXI.Container {
     }
   }
 
-  /** 載入素材；primary 失敗時可選 fallback */
+  /** 載入素材；primary 失敗時可選 fallback（見 asset-loader） */
   private async _loadAssetAlias(
     alias: string,
     primary: string,
     fallback?: string,
   ): Promise<boolean> {
-    const tryLoad = async (src: string) => {
-      await PIXI.Assets.load({ alias, src })
-    }
-    try {
-      await tryLoad(primary)
-      return true
-    } catch (e) {
-      if (!fallback || fallback === primary) {
-        console.warn(`[ChaseScene] asset load failed: ${primary}`, e)
-        return false
-      }
-      try {
-        console.warn(`[ChaseScene] fallback ${primary} → ${fallback}`)
-        await tryLoad(fallback)
-        return true
-      } catch (e2) {
-        console.warn(`[ChaseScene] fallback failed: ${fallback}`, e2)
-        return false
-      }
-    }
+    return loadTextureWithFallback(alias, primary, fallback, this.sessionStyle)
   }
 
   private _applyDocumentStyle(style: VisualStyle) {
@@ -326,6 +341,9 @@ export class ChaseScene extends PIXI.Container {
   }
 
   private _clearLayers() {
+    this.retroWorld?.destroy()
+    this.retroWorld = null
+    this.useRetroWorld = false
     for (const layer of [
       this.bgLayer, this.midLayer, this.roadLayer,
       this.gameLayer, this.fxLayer, this.hudLayer,
@@ -1567,9 +1585,16 @@ export class ChaseScene extends PIXI.Container {
 
     this.elapsed += dt
     const speed = Math.max(1.5, this.state.currentPower / 25)
-    this.roadOffset = (this.roadOffset + speed * dt * 80) % 160
+    const roadDelta = speed * dt * 80
+    this.roadOffset = (this.roadOffset + roadDelta) % 160
 
     this._redrawRoadSurface(progress)
+
+    // 復古視差世界（L0–L4 依 PARALLAX_SPEED）
+    if (this.useRetroWorld && this.retroWorld) {
+      this.retroWorld.setGroundY(this._baseGroundY())
+      this.retroWorld.update(roadDelta, (x) => this._groundYAt(x))
+    }
 
     this.roadDashes.forEach((d, i) => {
       d.x = (i * 160 - this.roadOffset + 160 * 10) % (this.roadDashes.length * 160) - 160
@@ -1577,7 +1602,7 @@ export class ChaseScene extends PIXI.Container {
     })
 
     for (let i = 0; i < this.lampSprites.length; i++) {
-      this.lampXs[i] -= speed * dt * 80
+      this.lampXs[i] -= roadDelta
       if (this.lampXs[i] < -20) this.lampXs[i] = this.app.screen.width + 80
       this.lampSprites[i].x = this.lampXs[i]
       this.lampSprites[i].y = this._groundYAt(this.lampXs[i])
