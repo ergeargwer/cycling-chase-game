@@ -763,7 +763,8 @@ export const THEMES: Record<string, ChaseTheme> = {
       assetAlias: 'chaser-foodpanda',
       runFrames: FOODPANDA_RUN_FRAMES,
       attackFrames: FOODPANDA_ATTACK_FRAMES,
-      displayHeight: 300,
+      // 與騎士同級、保溫袋加大存在感
+      displayHeight: 360,
       tint: 0xffffff,
       scaleMul: 1,
     },
@@ -999,7 +1000,8 @@ export const THEMES: Record<string, ChaseTheme> = {
       assetAlias: 'chaser-bikini',
       runFrames: BIKINI_RUN_FRAMES,
       attackFrames: BIKINI_ATTACK_FRAMES,
-      displayHeight: 300,
+      // 女騎士與主角同量級，略大一點增加逼近感
+      displayHeight: 340,
       tint: 0xffffff,
       scaleMul: 1,
     },
