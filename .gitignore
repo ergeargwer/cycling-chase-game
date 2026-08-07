@@ -2,12 +2,19 @@ node_modules/
 dist/
 dist-electron/
 release/
-assets/_sprite-preview/
 *.log
 
-# local opaque backups from bg keying
+# local previews / intermediate art work
+assets/_sprite-preview/
+assets/_gen/
+assets/_hq_backup/
 assets/*.opaque.png
 assets/*.bak
-
-# intermediate remove-bg outputs
 assets/*.pre_withoutbg.png
+assets/*.pre_hq.png
+assets/*.pre_hq_gen.png
+assets/*.pre_hq_gen.*
+assets/*_base.jpg
+assets/*_run.jpg
+assets/*_atk.jpg
+assets/*_fullsheet.jpg
