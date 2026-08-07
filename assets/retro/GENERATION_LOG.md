@@ -1,51 +1,35 @@
-# Retro asset generation log
+# Retro asset generation log (v2)
 
 **Date:** 2026-08-07  
-**Method:** Procedural pixel art (Python/PIL) matching design specs + optional AI style refs  
+**Spec:** `docs/retro-scene-props-spec.md` v2 + `docs/retro-asset-spec.md`  
+**Generator:** `tools/retro_gen/generate_all.py`
 
-## Delivered (engine-ready paths)
+## Spec compliance
 
-### Characters
-- `characters/rider.png` — 288×96 (6 normal + 6 nervous)
+| Item | Spec | Generated |
+|------|------|-----------|
+| Character cell | 48×48 | Yes — sheets 288×96 (6×2) |
+| Road body height | **48px** | `tiles/shared/road-body.png` 64×48 |
+| Mid strips | 128–256 wide | hills/pine/skyline/columbarium/arcade/etc. |
+| Cemetery | tombs, mounds, columbarium | Full redlady set |
+| Transparent PNG | RGBA | Yes |
+| Palette | limited 16–32 | Spec base palette |
 
-### Chasers (all 12, 288×96)
-shiba, bear, godzilla, redlady, jiangshi, alien, dumptruck, foodpanda, grandma, ambulance, firetruck, bikini
+## Counts
 
-### Shared tiles
-- `tiles/shared/road-body.png` (64×32 seamless)
-- `tiles/shared/road-dash.png`, `road-edge-*.png`, `shoulder.png`
-- `tiles/shared/sky-night.png` (128×96), `moon.png` (16×16)
-
-### Mid strips (parallax L1/L2)
-- shiba: hills, powerline
-- bear: pine
-- godzilla: skyline
-- redlady: **columbarium-strip**
-- jiangshi: village
-- alien: field
-- dumptruck: cliff
-- foodpanda: arcade
-- grandma: alley
-- ambulance: hospital
-- firetruck: burnt-street
-- bikini: sea
-
-### Props (priority)
-- redlady: tombs, mounds, censer, lantern, fence, dead-tree
-- shiba: lamp, pole, reflector
-- bear: trees
-- shared: cone, lamp, hydrant
-- foodpanda: scooter, bikini: lighthouse, firetruck: hydrant
-
-### FX
-- sweat, flame-4f, dust-4f, joss-paper-4f
-
-### AI refs (not runtime-required)
-- `_ai_ref/*` — style exploration stills / single cells
-
-## Quality note
-Procedural sheets are **placeholder-quality pixel art** for pipeline validation (correct grid, transparency, paths).  
-Upgrade path: redraw or AI-pixelize into same filenames without code changes.
+- Rider + 12 chasers
+- Shared tiles + theme shoulders/roads
+- Mid strips for all 12 themes (+ neon, fog, wave-2f, crop-circle)
+- Props: redlady complete + per-theme lists from P1
+- FX: flame/smoke/dust/joss/wisp/beacon/etc.
+- **~158 PNG** under `assets/retro/`
 
 ## Regenerate
-See `tools/retro_gen/README.md`.
+
+```bash
+python3 tools/retro_gen/generate_all.py
+```
+
+## Quality note
+
+Procedural pixel art for **engine path + size correctness**. Replace any file with higher-detail art using the **same filename** — no code changes required.
